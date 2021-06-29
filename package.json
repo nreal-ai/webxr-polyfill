@@ -45,7 +45,9 @@
     "build-script": "cross-env NODE_ENV=production rollup -c",
     "build-module": "cross-env NODE_ENV=production rollup -c rollup.config.module.js",
     "build-min": "cross-env NODE_ENV=production rollup -c rollup.config.min.js",
-    "build": "npm run build-script && npm run build-min && npm run build-module",
+    "copy": "cp build/webxr-polyfill.module.js ../exokit-web//webxr-samples/js/third-party/webxr-polyfill/build/webxr-polyfill.module.js",
+    "build": "npm run build-script && npm run build-min && npm run build-module && npm run copy",
+
     "test": "cross-env NODE_ENV=test mocha --require ./test/setup.js --exit --recursive",
     "preversion": "npm install && echo \"NO TESTS RUNNING\"",
     "version": "npm run build && git add build/*",
