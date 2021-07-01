@@ -40,6 +40,10 @@ const CONFIG_DEFAULTS = {
   // Whether a CardboardXRDevice should be created if no WebXR API found
   // on desktop or not. Stereoscopic rendering with a gyro often does not make sense on desktop, and probably only useful for debugging.
   allowCardboardOnDesktop: false,
+
+
+  // Force to use Nreal device
+  forceNreal: true,
 };
 
 const partials = ['navigator', 'HTMLCanvasElement', 'WebGLRenderingContext'];

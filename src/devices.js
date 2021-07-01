@@ -15,6 +15,7 @@
 
 import CardboardXRDevice from './devices/CardboardXRDevice';
 import InlineDevice from './devices/InlineDevice';
+import NRDevice from './devices/NRDevice';
 import WebVRDevice from './devices/WebVRDevice';
 
 import { isMobile } from './utils';
@@ -46,6 +47,14 @@ const getWebVRDevice = async function (global) {
  * @return {Promise<XRDevice?>}
  */
 export const requestXRDevice = async function (global, config) {
+
+  // Check for force use nreal device.
+  if (config.forceNreal){
+    console.log('force to use nreal devices.');
+    return new NRDevice(global);
+  }
+
+
   // Check for a 1.1 VRDisplay.
   if (config.webvr) {
     let xr = await getWebVRDevice(global);
