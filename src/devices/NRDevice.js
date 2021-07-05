@@ -196,8 +196,6 @@ export default class NRDevice extends XRDevice {
         const height = canvas.height;
 
 
-        // setup headset pose
-        this.poseMatrix = this._getHeadPose();
         // TODO: 
 
         // If session is not an inline session, XRWebGLLayer's composition disabled boolean
@@ -220,14 +218,18 @@ export default class NRDevice extends XRDevice {
 
         }
 
+        
+        // setup headset pose
+        this.poseMatrix = this._getHeadPose();
+
 
         // TODO: sync view and projection
         // setup projection matrix
         const aspect = width * (this.immersive ? 0.5 : 1.0) / height;
         let fov = this._getEyeFov('left')
-        mat4.frustum(this.leftProjectionMatrix, fov[0] * near, fov[1] * near, fov[3] * near, fov[2] * near, near, far);
+        mat4.frustum(this.leftProjectionMatrix, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
         fov = this._getEyeFov('right')
-        mat4.frustum(this.rightProjectionMatrix, fov[0] * near, fov[1] * near, fov[3] * near, fov[2] * near, near, far);
+        mat4.frustum(this.rightProjectionMatrix, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
 
 
         // setup view matrix
@@ -517,30 +519,31 @@ export default class NRDevice extends XRDevice {
         }
     }
 
+    // Interfaces for Nreal SDK.
+
+
     _getHeadPose() {
         if (this.provider != null) {
             const data = JSON.parse(this.provider.getHeadPose());
 
             var pose = mat4.clone(data);
-            // mat4.multiply(pose,pose,mat4.fromScaling(mat4.create(),vec3.fromValues(0,-1,0)));
-
             return pose;
         }
 
         return mat4.identity(mat4.create());
     }
     _getEyePoseFromHead(eye) {
-        // let eyeIndex = -1;
+        let eyeIndex = -1;
 
-        // if (eye === 'left' || eye === 'none') {
-        //     eyeIndex = 0;
-        // } else if (eye === 'right') {
-        //     eyeIndex = 1;
-        // } 
-        // if(this.provider != null){
-        //     const data = JSON.parse(this.provider.getEyePoseFromHead(eyeIndex));  
-        //     return mat4.clone(data);
-        // }
+        if (eye === 'left' || eye === 'none') {
+            eyeIndex = 0;
+        } else if (eye === 'right') {
+            eyeIndex = 1;
+        }
+        if (this.provider != null) {
+            const data = JSON.parse(this.provider.getEyePoseFromHead(eyeIndex));
+            return mat4.clone(data);
+        }
         return mat4.identity(mat4.create());
     }
 
@@ -555,9 +558,12 @@ export default class NRDevice extends XRDevice {
             var val = JSON.parse(this.provider.getEyeFov(eyeIndex));
             val[0] = -val[0];
             val[3] = -val[3];
-            // for(let i  = 0;i < 4;i++){
-            //     val[i] = Math.atan(val[i]);
-            // }
+            // sort to left,right,bottom,top
+            const  bottom = val[3];
+            val[3] = val[2];
+            val[2] = bottom;
+
+        
             return val;
         }
         return [1, 1, 1, 1];
