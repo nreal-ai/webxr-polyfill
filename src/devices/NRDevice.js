@@ -73,7 +73,7 @@ export default class NRDevice extends XRDevice {
 
 
 
-        this.provider = window.nrprovider != undefined?window.nrprovider:null;
+        this.provider = window.nrprovider != undefined ? window.nrprovider : null;
 
 
         this.debugout = true;
@@ -194,6 +194,10 @@ export default class NRDevice extends XRDevice {
         const far = renderState.depthFar;
         const width = canvas.width;
         const height = canvas.height;
+
+
+        // setup headset pose
+        this.poseMatrix = this._getHeadPose();
         // TODO: 
 
         // If session is not an inline session, XRWebGLLayer's composition disabled boolean
@@ -212,21 +216,25 @@ export default class NRDevice extends XRDevice {
             context.clearDepth(currentClearDepth);
             context.clearStencil(currentClearStencil);
 
+
+
         }
 
-        // setup headset pose
-        this.poseMatrix = this._getHeadPose();
 
         // TODO: sync view and projection
         // setup projection matrix
         const aspect = width * (this.immersive ? 0.5 : 1.0) / height;
-        mat4.perspective(this.leftProjectionMatrix, Math.PI / 2, aspect, near, far);
-        mat4.perspective(this.rightProjectionMatrix, Math.PI / 2, aspect, near, far);
-        // setup view matrix
+        let fov = this._getEyeFov('left')
+        mat4.frustum(this.leftProjectionMatrix, fov[0] * near, fov[1] * near, fov[3] * near, fov[2] * near, near, far);
+        fov = this._getEyeFov('right')
+        mat4.frustum(this.rightProjectionMatrix, fov[0] * near, fov[1] * near, fov[3] * near, fov[2] * near, near, far);
 
-        const ipd = this.immersive ? 0.03 : 1.0;
-        mat4.invert(this.leftViewMatrix, mat4.translate(this.leftViewMatrix, this.poseMatrix, vec3.fromValues(-ipd, 0, 0)));
-        mat4.invert(this.rightViewMatrix, mat4.translate(this.rightViewMatrix, this.poseMatrix, vec3.fromValues(ipd, 0, 0)));
+
+        // setup view matrix
+        let eyeOffset = this._getEyePoseFromHead('left');
+        mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.poseMatrix, eyeOffset));
+        eyeOffset = this._getEyePoseFromHead('right');
+        mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.poseMatrix, eyeOffset));
 
         // TODO: connect input source
 
@@ -509,44 +517,51 @@ export default class NRDevice extends XRDevice {
         }
     }
 
-    _getHeadPose(){
-        if(this.provider != null){
+    _getHeadPose() {
+        if (this.provider != null) {
             const data = JSON.parse(this.provider.getHeadPose());
 
-            return mat4.clone(data);
+            var pose = mat4.clone(data);
+            // mat4.multiply(pose,pose,mat4.fromScaling(mat4.create(),vec3.fromValues(0,-1,0)));
+
+            return pose;
         }
 
         return mat4.identity(mat4.create());
     }
-    _getEyePoseFromHead(eye){
-        let eyeIndex = -1;
+    _getEyePoseFromHead(eye) {
+        // let eyeIndex = -1;
 
-        if (eye === 'left' || eye === 'none') {
-            eyeIndex = 0;
-        } else if (eye === 'right') {
-            eyeIndex = 1;
-        } 
-        if(this.provider != null){
-            const data = JSON.parse(this.provider.getEyePoseFromHead(eyeIndex));  
-            return mat4.clone(data);
-        }
+        // if (eye === 'left' || eye === 'none') {
+        //     eyeIndex = 0;
+        // } else if (eye === 'right') {
+        //     eyeIndex = 1;
+        // } 
+        // if(this.provider != null){
+        //     const data = JSON.parse(this.provider.getEyePoseFromHead(eyeIndex));  
+        //     return mat4.clone(data);
+        // }
         return mat4.identity(mat4.create());
     }
 
-    _getEyeFov(eye){
+    _getEyeFov(eye) {
         let eyeIndex = -1;
         if (eye === 'left' || eye === 'none') {
             eyeIndex = 0;
         } else if (eye === 'right') {
             eyeIndex = 1;
-        } 
-        if(this.provider != null){
-            return JSON.parse(this.provider.getEyeFov(eyeIndex));  
         }
-        return [1,1,1,1];
+        if (this.provider != null) {
+            var val = JSON.parse(this.provider.getEyeFov(eyeIndex));
+            val[0] = -val[0];
+            val[3] = -val[3];
+            // for(let i  = 0;i < 4;i++){
+            //     val[i] = Math.atan(val[i]);
+            // }
+            return val;
+        }
+        return [1, 1, 1, 1];
     }
-
-
 
     _debugout(renderState) {
         if (!this.debugout) {
