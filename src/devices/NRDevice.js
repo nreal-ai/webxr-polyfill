@@ -178,7 +178,7 @@ export default class NRDevice extends XRDevice {
     requestAnimationFrame(callback) {
         var t_this = this;
         setTimeout(function () {
-            var ready = t_this.nrprovider && t_this.nrprovider.readyForNewFrame();
+            var ready = t_this.provider && t_this.provider.readyForNewFrame();
             if (ready == undefined){
                 return t_this.global.requestAnimationFrame(callback);
             }else if (ready) {
