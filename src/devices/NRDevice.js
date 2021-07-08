@@ -176,7 +176,18 @@ export default class NRDevice extends XRDevice {
      * @return {Function}
      */
     requestAnimationFrame(callback) {
-        return this.global.requestAnimationFrame(callback);
+        var t_this = this;
+        setTimeout(function () {
+            var ready = t_this.nrprovider && t_this.nrprovider.readyForNewFrame();
+            if (ready == undefined){
+                return t_this.global.requestAnimationFrame(callback);
+            }else if (ready) {
+                callback();
+            } else {
+                t_this.requestAnimationFrame(callback);
+            }
+        }, 1);
+        return 100;
     }
 
     /**
@@ -218,7 +229,7 @@ export default class NRDevice extends XRDevice {
 
         }
 
-        
+
         // setup headset pose
         this.poseMatrix = this._getHeadPose();
 
@@ -559,14 +570,14 @@ export default class NRDevice extends XRDevice {
             val[0] = -val[0];
             val[3] = -val[3];
             // sort to left,right,bottom,top
-            const  bottom = val[3];
+            const bottom = val[3];
             val[3] = val[2];
             val[2] = bottom;
 
-        
+
             return val;
         }
-        return [1, 1, 1, 1];
+        return [-1, 1, -1, 1];
     }
 
     _debugout(renderState) {
