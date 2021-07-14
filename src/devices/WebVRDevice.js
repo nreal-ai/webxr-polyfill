@@ -253,6 +253,7 @@ export default class WebVRDevice extends XRDevice {
 
     this.sessions.set(session.id, session);
 
+
     if (immersive) {
       this.immersiveSession = session;
       this.dispatchEvent('@@webxr-polyfill/vr-present-start', session.id);
