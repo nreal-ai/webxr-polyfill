@@ -176,21 +176,18 @@ export default class NRDevice extends XRDevice {
      * @return {Function}
      */
     requestAnimationFrame(callback) {
-        // var t_this = this;
-        // setTimeout(function () {
-        //     var ready = t_this.provider && t_this.provider.readyForNewFrame();
-        //     if (ready == undefined){
-        //         return t_this.global.requestAnimationFrame(callback);
-        //     }else if (ready) {
-        //         callback();
-        //     } else {
-        //         t_this.requestAnimationFrame(callback);
-        //     }
-        // }, 1);
-        // return 100;
-
-
-        return this.global.requestAnimationFrame(callback);
+        var t_this = this;
+        setTimeout(function () {
+            var ready = t_this.provider && t_this.provider.readyForNewFrame();
+            if (ready == undefined){
+                return t_this.global.requestAnimationFrame(callback);
+            }else if (ready) {
+                callback();
+            } else {
+                t_this.requestAnimationFrame(callback);
+            }
+        }, 1);
+        return 100;
     }
 
     /**
