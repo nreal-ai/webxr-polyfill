@@ -44,6 +44,8 @@ const CONFIG_DEFAULTS = {
 
   // Force to use Nreal device
   forceNreal: true,
+
+  webvrCompatible : true,
 };
 
 const partials = ['navigator', 'HTMLCanvasElement', 'WebGLRenderingContext'];
@@ -63,6 +65,10 @@ export default class WebXRPolyfill {
       this._injectPolyfill(this.global);
     } else {
       this._injectCompatibilityShims(this.global);
+    }
+
+    if(this.config.webvrCompatible){
+      _
     }
   }
 
