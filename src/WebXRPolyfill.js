@@ -22,6 +22,8 @@ import {
 import { isImageBitmapSupported, isMobile } from './utils';
 import { requestXRDevice } from './devices';
 
+import WebVRPolyfill from './vr/webvr_patch.js';
+
 const CONFIG_DEFAULTS = {
   // The default global to use for needed APIs.
   global: GLOBAL,
@@ -68,7 +70,7 @@ export default class WebXRPolyfill {
     }
 
     if(this.config.webvrCompatible){
-      _
+      let webvr  = new WebVRPolyfill();
     }
   }
 
