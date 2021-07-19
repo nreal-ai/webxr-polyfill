@@ -26,6 +26,15 @@ function injectedScript() {
 		rightEye: { offset: 0.030, up: 40, down: 40, left: 40, right: 40 }
 	}
 
+
+	var NrealLight = {
+		name: 'Nreal Light',
+		resolution: { width: 1920, height: 1080 },
+		features: { canPresent: true, hasExternalDisplay: false, hasOrientation: true, hasPosition: true },
+		leftEye: { offset: -0.030, up: 40, down: 40, left: 40, right: 40 },
+		rightEye: { offset: 0.030, up: 40, down: 40, left: 40, right: 40 }
+	}
+
 	var startDate = Date.now();
 	var startPerfNow = performance.now();
 
@@ -479,7 +488,7 @@ function injectedScript() {
 
 	( function() {
 
-		var vrD = new VRDisplay( ViveData )
+		var vrD = new VRDisplay( NrealLight )
 
 		navigator.getVRDisplays = function() {
 
