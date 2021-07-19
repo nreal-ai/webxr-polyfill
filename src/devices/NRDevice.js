@@ -7,7 +7,8 @@ import { PRIVATE as XRSESSION_PRIVATE } from '../api/XRSession';
 import {
     vec3,
     quat,
-    mat4
+    mat4,
+
 } from 'gl-matrix/src/gl-matrix';
 
 
@@ -34,7 +35,38 @@ class Session {
 
 
 const DIV_Z_INDEX = '9999';
+
+
+var g_frame_data = "";
+var g_frame_data_state = 0;
+var g_frame_data_count = 0;
+function prepareForNextFrame(frame_data) {
+    console.log("prepareForNextFrame " + frame_data);
+    g_frame_data = frame_data;
+    g_frame_data_state = 1;
+    g_frame_data_count++;
+}
+
+
 export default class NRDevice extends XRDevice {
+
+    _onDeviceConnect() {
+
+        const near = 0.01;
+        const far = 1000;
+
+        let fov = this.getEyeFov('left')
+        mat4.frustum(this.leftProjectionMatrix, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
+        fov = this.getEyeFov('right')
+        mat4.frustum(this.rightProjectionMatrix, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
+
+        this.eyeOffset = {
+            left: this.getEyePoseFromHead('left'),
+            right: this.getEyePoseFromHead('right'),
+        };
+
+    }
+
     constructor(global) {
         super(global);
         // TODO:
@@ -43,10 +75,9 @@ export default class NRDevice extends XRDevice {
         this.features = ['viewer', 'local'];
 
 
-
         // headset pose
         this.poseMatrix = mat4.create();
-        mat4.fromTranslation(this.poseMatrix, vec3.fromValues(0, 0.0, 0));
+        mat4.fromTranslation(this.poseMatrix, vec3.fromValues(0, 1.0, 0));
 
         // projection 
         this.leftProjectionMatrix = mat4.create();
@@ -71,12 +102,17 @@ export default class NRDevice extends XRDevice {
             height: 0
         };
 
-
+        this.eyeOffset = {
+            left: mat4.create(),
+            right: mat4.create(),
+        };
 
         this.provider = window.nrprovider != undefined ? window.nrprovider : null;
-
+        this._onDeviceConnect();
 
         this.debugout = true;
+
+        this.global.prepareForNextFrame = prepareForNextFrame;
     }
 
 
@@ -88,6 +124,8 @@ export default class NRDevice extends XRDevice {
      * @param {XRWebGLLayer} layer
      */
     onBaseLayerSet(sessionId, layer) {
+
+        // FIXME:?
         const session = this.sessions.get(sessionId);
 
 
@@ -178,10 +216,13 @@ export default class NRDevice extends XRDevice {
     requestAnimationFrame(callback) {
         var t_this = this;
         setTimeout(function () {
-            var ready = t_this.provider && t_this.provider.readyForNewFrame();
-            if (ready == undefined){
+            if (t_this.provider == undefined) {
                 return t_this.global.requestAnimationFrame(callback);
-            }else if (ready) {
+            } else if (g_frame_data_state == 1) {
+                g_frame_data_state = 0;
+                console.log("call callback " + g_frame_data_count);
+                const data = JSON.parse(g_frame_data);
+                t_this.poseMatrix = mat4.clone(data);
                 callback();
             } else {
                 t_this.requestAnimationFrame(callback);
@@ -224,36 +265,23 @@ export default class NRDevice extends XRDevice {
             context.clearColor(currentClearColor[0], currentClearColor[1], currentClearColor[2], currentClearColor[3]);
             context.clearDepth(currentClearDepth);
             context.clearStencil(currentClearStencil);
-
-
-
         }
-
-
-        // setup headset pose
-        this.poseMatrix = this._getHeadPose();
-
-
-        // TODO: sync view and projection
-        // setup projection matrix
-        const aspect = width * (this.immersive ? 0.5 : 1.0) / height;
-        let fov = this._getEyeFov('left')
-        mat4.frustum(this.leftProjectionMatrix, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
-        fov = this._getEyeFov('right')
-        mat4.frustum(this.rightProjectionMatrix, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
-
-
-        // setup view matrix
-        let eyeOffset = this._getEyePoseFromHead('left');
-        mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.poseMatrix, eyeOffset));
-        eyeOffset = this._getEyePoseFromHead('right');
-        mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.poseMatrix, eyeOffset));
-
+        // const aspect = width * (this.immersive ? 0.5 : 1.0) / height;
+        this.updateFrameData(near, far);
         // TODO: connect input source
 
         this._debugout(renderState);
 
     }
+
+
+    updateFrameData(near, far) {
+        // setup view matrix
+        mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.poseMatrix, this.eyeOffset.left));
+        mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.poseMatrix, this.eyeOffset.right));
+
+    }
+
     /**
      * @param {number} sessionId
      */
@@ -543,7 +571,7 @@ export default class NRDevice extends XRDevice {
 
         return mat4.identity(mat4.create());
     }
-    _getEyePoseFromHead(eye) {
+    getEyePoseFromHead(eye) {
         let eyeIndex = -1;
 
         if (eye === 'left' || eye === 'none') {
@@ -558,7 +586,7 @@ export default class NRDevice extends XRDevice {
         return mat4.identity(mat4.create());
     }
 
-    _getEyeFov(eye) {
+    getEyeFov(eye) {
         let eyeIndex = -1;
         if (eye === 'left' || eye === 'none') {
             eyeIndex = 0;
@@ -591,5 +619,5 @@ export default class NRDevice extends XRDevice {
         console.log('projection matrix=' + this.leftProjectionMatrix);
         console.log('view matrix=' + this.leftViewMatrix);
     }
-
 }
+
