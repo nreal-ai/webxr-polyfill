@@ -2,8 +2,8 @@
 import NrealVRDisplay from "./nreal-vr-display";
 
 
-function WebVRPolyfill(config) {
-    this.config = config;
+function WebVRPolyfill(global) {
+    this.global = global;
 
     this.polyfillDisplays = [];
     this.enabled = false;
@@ -35,7 +35,7 @@ WebVRPolyfill.prototype.getPolyfillDisplays = function () {
         return this.polyfillDisplays;
     }
 
-    this.polyfillDisplays.push(new NrealVRDisplay());
+    this.polyfillDisplays.push(new NrealVRDisplay(this.global));
 
     this._polyfillDisplaysPopulated = true;
     return this.polyfillDisplays;

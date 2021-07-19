@@ -24,6 +24,8 @@ import { requestXRDevice } from './devices';
 
 import WebVRPolyfill from './vr/webvr_patch.js';
 
+import './vr/polyfill';
+
 const CONFIG_DEFAULTS = {
   // The default global to use for needed APIs.
   global: GLOBAL,
@@ -70,7 +72,9 @@ export default class WebXRPolyfill {
     }
 
     if(this.config.webvrCompatible){
-      let webvr  = new WebVRPolyfill();
+      let webvr  = new WebVRPolyfill(this.global);
+
+      // injectedScript();
     }
   }
 
