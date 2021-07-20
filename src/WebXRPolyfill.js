@@ -22,6 +22,10 @@ import {
 import { isImageBitmapSupported, isMobile } from './utils';
 import { requestXRDevice } from './devices';
 
+import WebVRPolyfill from './vr/webvr_patch.js';
+
+import injectedScript from './vr/polyfill';
+
 const CONFIG_DEFAULTS = {
   // The default global to use for needed APIs.
   global: GLOBAL,
@@ -44,6 +48,8 @@ const CONFIG_DEFAULTS = {
 
   // Force to use Nreal device
   forceNreal: true,
+
+  webvrCompatible : true,
 };
 
 const partials = ['navigator', 'HTMLCanvasElement', 'WebGLRenderingContext'];
@@ -63,6 +69,11 @@ export default class WebXRPolyfill {
       this._injectPolyfill(this.global);
     } else {
       this._injectCompatibilityShims(this.global);
+    }
+
+    if(this.config.webvrCompatible){
+
+      injectedScript();
     }
   }
 
