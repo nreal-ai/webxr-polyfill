@@ -1,32 +1,8 @@
+import { vec3, mat4, mat3 } from 'gl-matrix/src/gl-matrix';
+
 function injectedScript() {
 
 	'use strict';
-
-	var ViveData = {
-		name: 'Emulated HTC Vive DVT',
-		resolution: { width: 1512, height: 1680 },
-		features: { canPresent: true, hasExternalDisplay: false, hasOrientation: true, hasPosition: true },
-		leftEye: { offset: -0.032, up: 41.653, down: 48.008, left: 43.977, right: 35.575 },
-		rightEye: { offset: 0.032, up: 41.653, down: 48.008, left: 35.575, right: 43.977 }
-	}
-
-	var RiftData = {
-		name: 'Emulated Oculus Rift CV1',
-		resolution: { width: 1332, height: 1586 },
-		features: { canPresent: true, hasExternalDisplay: true, hasOrientation: true, hasPosition: true },
-		leftEye: { offset: -0.032, up: 55.814, down: 55.728, left: 54.429, right: 51.288 },
-		rightEye: { offset: 0.032, up: 55.687, down: 55.658, left: 51.110, right: 54.397 }
-	}
-
-	var CardboardData = {
-		name: 'Emulated Google, Inc. Cardboard v1',
-		resolution: { width: 960, height: 1080 },
-		features: { canPresent: true, hasExternalDisplay: false, hasOrientation: true, hasPosition: false },
-		leftEye: { offset: -0.030, up: 40, down: 40, left: 40, right: 40 },
-		rightEye: { offset: 0.030, up: 40, down: 40, left: 40, right: 40 }
-	}
-
-
 	var NrealLight = {
 		name: 'Nreal Light',
 		resolution: { width: 1920, height: 1080 },
@@ -35,12 +11,16 @@ function injectedScript() {
 		rightEye: { offset: 0.030, up: 40, down: 40, left: 40, right: 40 }
 	}
 
+	var Eye = {
+		LEFT: 'left',
+		RIGHT: 'right'
+	};
 	var startDate = Date.now();
 	var startPerfNow = performance.now();
 
 	// WebVR 1.0
 
-	function VRDisplayCapabilities () {
+	function VRDisplayCapabilities() {
 
 		this.canPresent = true;
 		this.hasExternalDisplay = true;
@@ -52,12 +32,12 @@ function injectedScript() {
 
 	function VRStageParameters() {
 
-		this.sittingToStandingTransform = new Float32Array( [
+		this.sittingToStandingTransform = new Float32Array([
 			1, 0, 0, 0,
 			0, 1, 0, 0,
 			0, 0, 1, 0,
 			0, 0, 0, 1
-		] );
+		]);
 
 		this.sizeX = 5;
 		this.sizeZ = 3;
@@ -66,12 +46,12 @@ function injectedScript() {
 
 	function VRPose() {
 
-		this.timestamp = startDate + ( performance.now() - startPerfNow );
-		this.position = new Float32Array( [ 0, 0, 0 ] );
-		this.linearVelocity = new Float32Array( [ 0, 0, 0 ] );
+		this.timestamp = startDate + (performance.now() - startPerfNow);
+		this.position = new Float32Array([0, 0, 0]);
+		this.linearVelocity = new Float32Array([0, 0, 0]);
 		this.linearAcceleration = null;
-		this.orientation = new Float32Array( [ 0, 0, 0, 1 ] );
-		this.angularVelocity = new Float32Array( [ 0, 0, 0 ] );
+		this.orientation = new Float32Array([0, 0, 0, 1]);
+		this.angularVelocity = new Float32Array([0, 0, 0]);
 		this.angularAcceleration = null;
 
 	}
@@ -87,7 +67,7 @@ function injectedScript() {
 
 	function VREyeParameters() {
 
-		this.offset = new Float32Array( [ 0, 0, 0 ] );
+		this.offset = new Float32Array([0, 0, 0]);
 		this.fieldOfView = new VRFieldOfView();
 		this.renderWidth = 0;
 		this.renderHeight = 0;
@@ -104,17 +84,17 @@ function injectedScript() {
 
 	function VRFrameData() {
 
-		this.leftProjectionMatrix = new Float32Array( 16 );
-		this.leftViewMatrix = new Float32Array( 16 );
-		this.rightProjectionMatrix = new Float32Array( 16 );
-		this.rightViewMatrix = new Float32Array( 16 );
+		this.leftProjectionMatrix = new Float32Array(16);
+		this.leftViewMatrix = new Float32Array(16);
+		this.rightProjectionMatrix = new Float32Array(16);
+		this.rightViewMatrix = new Float32Array(16);
 		this.pose = null;
 
 	}
 
 	// from webvr-polyfill
 
-	var frameDataFromPose = (function() {
+	var frameDataFromPose = (function () {
 
 		var piOver180 = Math.PI / 180.0;
 		var rad45 = Math.PI * 0.25;
@@ -123,11 +103,11 @@ function injectedScript() {
 		function mat4_perspectiveFromFieldOfView(out, fov, near, far) {
 
 			var upTan = Math.tan(fov ? (fov.upDegrees * piOver180) : rad45),
-			downTan = Math.tan(fov ? (fov.downDegrees * piOver180) : rad45),
-			leftTan = Math.tan(fov ? (fov.leftDegrees * piOver180) : rad45),
-			rightTan = Math.tan(fov ? (fov.rightDegrees * piOver180) : rad45),
-			xScale = 2.0 / (leftTan + rightTan),
-			yScale = 2.0 / (upTan + downTan);
+				downTan = Math.tan(fov ? (fov.downDegrees * piOver180) : rad45),
+				leftTan = Math.tan(fov ? (fov.leftDegrees * piOver180) : rad45),
+				rightTan = Math.tan(fov ? (fov.rightDegrees * piOver180) : rad45),
+				xScale = 2.0 / (leftTan + rightTan),
+				yScale = 2.0 / (upTan + downTan);
 
 			out[0] = xScale;
 			out[1] = 0.0;
@@ -153,19 +133,19 @@ function injectedScript() {
 
 			// Quaternion math
 			var x = q[0], y = q[1], z = q[2], w = q[3],
-			x2 = x + x,
-			y2 = y + y,
-			z2 = z + z,
+				x2 = x + x,
+				y2 = y + y,
+				z2 = z + z,
 
-			xx = x * x2,
-			xy = x * y2,
-			xz = x * z2,
-			yy = y * y2,
-			yz = y * z2,
-			zz = z * z2,
-			wx = w * x2,
-			wy = w * y2,
-			wz = w * z2;
+				xx = x * x2,
+				xy = x * y2,
+				xz = x * z2,
+				yy = y * y2,
+				yz = y * z2,
+				zz = z * z2,
+				wx = w * x2,
+				wy = w * y2,
+				wz = w * z2;
 
 			out[0] = 1 - (yy + zz);
 			out[1] = xy + wz;
@@ -191,9 +171,9 @@ function injectedScript() {
 		function mat4_translate(out, a, v) {
 
 			var x = v[0], y = v[1], z = v[2],
-			a00, a01, a02, a03,
-			a10, a11, a12, a13,
-			a20, a21, a22, a23;
+				a00, a01, a02, a03,
+				a10, a11, a12, a13,
+				a20, a21, a22, a23;
 
 			if (a === out) {
 				out[12] = a[0] * x + a[4] * y + a[8] * z + a[12];
@@ -222,25 +202,25 @@ function injectedScript() {
 		function mat4_invert(out, a) {
 
 			var a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
-			a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
-			a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
-			a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
+				a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+				a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
+				a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
 
-			b00 = a00 * a11 - a01 * a10,
-			b01 = a00 * a12 - a02 * a10,
-			b02 = a00 * a13 - a03 * a10,
-			b03 = a01 * a12 - a02 * a11,
-			b04 = a01 * a13 - a03 * a11,
-			b05 = a02 * a13 - a03 * a12,
-			b06 = a20 * a31 - a21 * a30,
-			b07 = a20 * a32 - a22 * a30,
-			b08 = a20 * a33 - a23 * a30,
-			b09 = a21 * a32 - a22 * a31,
-			b10 = a21 * a33 - a23 * a31,
-			b11 = a22 * a33 - a23 * a32,
+				b00 = a00 * a11 - a01 * a10,
+				b01 = a00 * a12 - a02 * a10,
+				b02 = a00 * a13 - a03 * a10,
+				b03 = a01 * a12 - a02 * a11,
+				b04 = a01 * a13 - a03 * a11,
+				b05 = a02 * a13 - a03 * a12,
+				b06 = a20 * a31 - a21 * a30,
+				b07 = a20 * a32 - a22 * a30,
+				b08 = a20 * a33 - a23 * a30,
+				b09 = a21 * a32 - a22 * a31,
+				b10 = a21 * a33 - a23 * a31,
+				b11 = a22 * a33 - a23 * a32,
 
-			// Calculate the determinant
-			det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+				// Calculate the determinant
+				det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
 
 			if (!det) {
 				return null;
@@ -285,7 +265,7 @@ function injectedScript() {
 
 		}
 
-		return function(frameData, pose, vrDisplay) {
+		return function (frameData, pose, vrDisplay) {
 
 			if (!frameData || !pose)
 				return false;
@@ -306,18 +286,23 @@ function injectedScript() {
 
 	})();
 
-	function createVRDisplayEvent( type, display, reason ) {
 
-		var event = new CustomEvent( type );
+
+
+
+	function createVRDisplayEvent(type, display, reason) {
+
+		var event = new CustomEvent(type);
 		event.display = display;
 		event.reason = reason;
 
 		return event;
 
 	}
+	function VRDisplay(model) {
 
-	function VRDisplay( model ) {
 
+		this.provider = window.nrprovider != undefined ? window.nrprovider : null;
 		this.depthFar = 1000;
 		this.depthNear = .1;
 		this.displayId = 1;
@@ -337,6 +322,7 @@ function injectedScript() {
 
 		this.pose = new VRPose();
 
+
 		this.leftEyeParameters = new VREyeParameters();
 		this.leftEyeParameters.fieldOfView.upDegrees = model.leftEye.up;
 		this.leftEyeParameters.fieldOfView.downDegrees = model.leftEye.down;
@@ -344,7 +330,7 @@ function injectedScript() {
 		this.leftEyeParameters.fieldOfView.rightDegrees = model.leftEye.right;
 		this.leftEyeParameters.renderWidth = model.resolution.width;
 		this.leftEyeParameters.renderHeight = model.resolution.height;
-		this.leftEyeParameters.offset[ 0 ] = model.leftEye.offset;
+		this.leftEyeParameters.offset[0] = model.leftEye.offset;
 
 		this.rightEyeParameters = new VREyeParameters();
 		this.rightEyeParameters.fieldOfView.upDegrees = model.rightEye.up;
@@ -353,124 +339,168 @@ function injectedScript() {
 		this.rightEyeParameters.fieldOfView.rightDegrees = model.rightEye.right;
 		this.rightEyeParameters.renderWidth = model.resolution.width;
 		this.rightEyeParameters.renderHeight = model.resolution.height;
-		this.rightEyeParameters.offset[ 0 ] = model.rightEye.offset;
+		this.rightEyeParameters.offset[0] = model.rightEye.offset;
 
-		window.addEventListener( 'webvr-pose', function( e ) {
 
-			this.pose.linearVelocity[ 0 ] = e.detail.position.x - this.pose.position[ 0 ];
-			this.pose.linearVelocity[ 1 ] = e.detail.position.y - this.pose.position[ 1 ];
-			this.pose.linearVelocity[ 2 ] = e.detail.position.z - this.pose.position[ 2 ];
+		// read eye parameters 
+		if (this.provider != null) {
 
-			this.pose.position[ 0 ] = e.detail.position.x;
-			this.pose.position[ 1 ] = e.detail.position.y;
-			this.pose.position[ 2 ] = e.detail.position.z;
+			
+			this._readEyeParameters();
+		}
 
-			this.pose.orientation[ 0 ] = e.detail.rotation.x;
-			this.pose.orientation[ 1 ] = e.detail.rotation.y;
-			this.pose.orientation[ 2 ] = e.detail.rotation.z;
-			this.pose.orientation[ 3 ] = e.detail.rotation.w;
 
-		}.bind( this ) );
 
-		window.addEventListener( 'webvr-hmd-activate', function( e ) {
+		// TODO: fire these events while device status changees
 
-			if( e.detail.state ){
-				var event = createVRDisplayEvent( 'vrdisplayactivate', this, 'HMD activated' );
+		window.addEventListener('webvr-hmd-activate', function (e) {
+
+			if (e.detail.state) {
+				var event = createVRDisplayEvent('vrdisplayactivate', this, 'HMD activated');
 				window.dispatchEvent(event);
 			} else {
-				var event = createVRDisplayEvent( 'vrdisplaydeactivate', this, 'HMD deactivated' );
+				var event = createVRDisplayEvent('vrdisplaydeactivate', this, 'HMD deactivated');
 				window.dispatchEvent(event);
 			}
-
-		}.bind( this ) );
-
-	}
-
-	VRDisplay.prototype.requestAnimationFrame = function( c ) {
-
-		return requestAnimationFrame( c );
+		}.bind(this));
 
 	}
 
-	VRDisplay.prototype.cancelAnimationFrame = function(handle) {
+
+	VRDisplay.prototype._readEyeParameters = function () {
+
+		// TODO: read resolution from sdk.
+		// for left eye
+
+
+		let fov = JSON.parse(this.provider.getEyeFov(Eye.LEFT));
+
+		const toDegree = 180 / Math.PI;
+		var degrees = new Float32Array(4);
+		for (let i = 0 ;i <4;i++){
+			degrees[i] = Math.abs(Math.atan(fov[i]) *toDegree);
+		}
+
+		this.leftEyeParameters.fieldOfView.upDegrees = degrees[3];
+		this.leftEyeParameters.fieldOfView.downDegrees = degrees[2];
+		this.leftEyeParameters.fieldOfView.leftDegrees = degrees[0];
+		this.leftEyeParameters.fieldOfView.rightDegrees = degrees[1];
+		// this.leftEyeParameters.renderWidth = model.resolution.width;
+		// this.leftEyeParameters.renderHeight = model.resolution.height;
+
+		let eyedata = JSON.parse(this.provider.getEyePoseFromHead(Eye.LEFT));
+		let translation = vec3.create();
+		mat4.getTranslation(translation, eyedata);
+		this.leftEyeParameters.offset = translation
+
+		// for right eye
+		fov = JSON.parse(this.provider.getEyeFov(Eye.RIGHT));
+		for (let i = 0 ;i <4;i++){
+			degrees[i] = Math.abs(Math.atan(fov[i]) *toDegree);
+		}
+		this.rightEyeParameters.fieldOfView.upDegrees = degrees[3];
+		this.rightEyeParameters.fieldOfView.downDegrees = degrees[2];
+		this.rightEyeParameters.fieldOfView.leftDegrees = degrees[0];
+		this.rightEyeParameters.fieldOfView.rightDegrees = degrees[1];
+		// this.rightEyeParameters.renderWidth = model.resolution.width;
+		// this.rightEyeParameters.renderHeight = model.resolution.height;
+
+		eyedata = JSON.parse(this.provider.getEyePoseFromHead(Eye.RIGHT));
+		translation = vec3.create();
+		mat4.getTranslation(translation, eyedata);
+		this.rightEyeParameters.offset = translation;
+	}
+
+	VRDisplay.prototype.requestAnimationFrame = function (c) {
+
+		return requestAnimationFrame(c);
+
+	}
+
+	VRDisplay.prototype.cancelAnimationFrame = function (handle) {
 
 		cancelAnimationFrame(handle);
 
 	}
 
-	VRDisplay.prototype.getEyeParameters = function( id ) {
+	VRDisplay.prototype.getEyeParameters = function (id) {
 
-		if( id === 'left' ) return this.leftEyeParameters;
+		if (id === 'left') return this.leftEyeParameters;
 		return this.rightEyeParameters;
 
 	}
 
-	VRDisplay.prototype.getPose = function() {
+	VRDisplay.prototype.getPose = function () {
 
-		this.pose.timestamp = startDate + ( performance.now() - startPerfNow );
+		this.pose.timestamp = startDate + (performance.now() - startPerfNow);
 
+		if(this.provider != null){
+			const data = JSON.parse(this.provider.getHeadPose());
+            let pose = mat4.clone(data);
+			mat4.getTranslation(this.pose.position,pose);
+			mat4.getRotation(this.pose.orientation,pose);
+		}
 		return this.pose;
 
 	}
 
-	VRDisplay.prototype.getFrameData = function( frameData ){
+	VRDisplay.prototype.getFrameData = function (frameData) {
 
-		return frameDataFromPose( frameData, this.getPose(), this );
-
+		return frameDataFromPose(frameData, this.getPose(), this);
 	}
 
-	VRDisplay.prototype.requestPresent = function(layers) {
+	VRDisplay.prototype.requestPresent = function (layers) {
 
-		return new Promise( function( resolve, reject ) {
+		return new Promise(function (resolve, reject) {
 
 			this.isPresenting = true;
 
 			this.layers = [];
-			layers.forEach( function( l ) {
+			layers.forEach(function (l) {
 				var layer = new VRLayer();
 				layer.source = l.source;
-				if( l.leftBounds ) layer.leftBounds = l.leftBounds;
-				if( l.rightBounds ) layer.rightBounds = l.rightBounds;
-				this.layers.push( layer );
+				if (l.leftBounds) layer.leftBounds = l.leftBounds;
+				if (l.rightBounds) layer.rightBounds = l.rightBounds;
+				this.layers.push(layer);
 			}.bind(this));
 
-			var event = createVRDisplayEvent( 'vrdisplaypresentchange', this, 'Presenting requested' );
+			var event = createVRDisplayEvent('vrdisplaypresentchange', this, 'Presenting requested');
 			window.dispatchEvent(event);
 
 			resolve();
 
-		}.bind( this ) );
+		}.bind(this));
 
 	}
 
-	VRDisplay.prototype.exitPresent = function() {
+	VRDisplay.prototype.exitPresent = function () {
 
-		return new Promise( function( resolve, reject ) {
+		return new Promise(function (resolve, reject) {
 
 			this.isPresenting = false;
 
 			this.layers = [];
 
-			var event = createVRDisplayEvent( 'vrdisplaypresentchange', this, 'Presenting exited' );
+			var event = createVRDisplayEvent('vrdisplaypresentchange', this, 'Presenting exited');
 			window.dispatchEvent(event);
 
 			resolve();
 
-		}.bind( this ) );
+		}.bind(this));
 
 	}
 
-	VRDisplay.prototype.submitFrame = function( pose ) {
+	VRDisplay.prototype.submitFrame = function (pose) {
 	}
 
-	VRDisplay.prototype.resetPose = function() {
+	VRDisplay.prototype.resetPose = function () {
 
-		var event = new Event( 'webvr-resetpose' );
-		window.dispatchEvent( event );
+		var event = new Event('webvr-resetpose');
+		window.dispatchEvent(event);
 
 	}
 
-	VRDisplay.prototype.getLayers = function() {
+	VRDisplay.prototype.getLayers = function () {
 
 		return this.layers;
 
@@ -486,23 +516,23 @@ function injectedScript() {
 
 	assignToWindow();
 
-	( function() {
+	(function () {
 
-		var vrD = new VRDisplay( NrealLight )
+		var vrD = new VRDisplay(NrealLight)
 
-		navigator.getVRDisplays = function() {
+		navigator.getVRDisplays = function () {
 
-			return new Promise( function( resolve, reject ) {
+			return new Promise(function (resolve, reject) {
 
-				resolve( [ vrD ] );
+				resolve([vrD]);
 
-			} );
+			});
 
 		}
 
-	} )();
-	var event = new Event( 'webvr-ready' );
-	window.dispatchEvent( event );
+	})();
+	var event = new Event('webvr-ready');
+	window.dispatchEvent(event);
 
 }
 

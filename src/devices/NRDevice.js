@@ -571,6 +571,7 @@ export default class NRDevice extends XRDevice {
 
         return mat4.identity(mat4.create());
     }
+
     getEyePoseFromHead(eye) {
         let eyeIndex = -1;
 
@@ -579,7 +580,9 @@ export default class NRDevice extends XRDevice {
         } else if (eye === 'right') {
             eyeIndex = 1;
         }
+        
         if (this.provider != null) {
+            // matrix4 array 
             const data = JSON.parse(this.provider.getEyePoseFromHead(eyeIndex));
             return mat4.clone(data);
         }
@@ -594,6 +597,7 @@ export default class NRDevice extends XRDevice {
             eyeIndex = 1;
         }
         if (this.provider != null) {
+            // float4 array, tangent values of the 
             var val = JSON.parse(this.provider.getEyeFov(eyeIndex));
             val[0] = -val[0];
             val[3] = -val[3];
