@@ -40,13 +40,18 @@ const DIV_Z_INDEX = '9999';
 var g_frame_data = "";
 var g_frame_data_state = 0;
 var g_frame_data_count = 0;
+var g_controller_data = "";
 function prepareForNextFrame(frame_data) {
     console.log("prepareForNextFrame " + frame_data);
-    g_frame_data = frame_data;
+
+    var jsonObject = JSON.parse(frame_data);
+
+    g_frame_data = jsonObject.headpose;
+    g_controller_data = jsonObject.controller;
+
     g_frame_data_state = 1;
     g_frame_data_count++;
 }
-
 
 export default class NRDevice extends XRDevice {
 
@@ -109,6 +114,16 @@ export default class NRDevice extends XRDevice {
 
         this.provider = window.nrprovider != undefined ? window.nrprovider : null;
         this._onDeviceConnect();
+
+
+
+        this.controllerCount = 0;
+        this.controllerisTouching = new Array();
+        this.controllerisButtonDown = new Array();
+        this.controllerisButtonUp = new Array();
+        this.controllerRay = new Array();
+
+
 
         this.debugout = true;
 
@@ -221,8 +236,25 @@ export default class NRDevice extends XRDevice {
             } else if (g_frame_data_state == 1) {
                 g_frame_data_state = 0;
                 console.log("call callback " + g_frame_data_count);
-                const data = JSON.parse(g_frame_data);
-                t_this.poseMatrix = mat4.clone(data);
+                t_this.poseMatrix = mat4.clone(g_frame_data);
+
+                if (g_controller_data) {
+                    t_this.controllerCount = g_controller_data.count;
+                    for (var i = 0; i < t_this.controllerCount; i++) {
+                        t_this.controllerisTouching[i] = g_controller_data.data[i][0];
+                        t_this.controllerisButtonDown[i] = g_controller_data.data[i][1];
+                        t_this.controllerisButtonUp[i] = g_controller_data.data[i][2];
+                        t_this.controllerRay[0] = g_controller_data.data[i][3];
+                        t_this.controllerRay[1] = g_controller_data.data[i][4];
+                        t_this.controllerRay[2] = g_controller_data.data[i][5];
+                        t_this.controllerRay[3] = g_controller_data.data[i][6];
+                        t_this.controllerRay[4] = g_controller_data.data[i][7];
+                        t_this.controllerRay[5] = g_controller_data.data[i][8];
+                        t_this.controllerRay[6] = g_controller_data.data[i][9];
+
+                        console.log("call controllerisTouching " + t_this.controllerisTouching[i]);
+                    }
+                }
                 callback();
             } else {
                 t_this.requestAnimationFrame(callback);
@@ -457,7 +489,8 @@ export default class NRDevice extends XRDevice {
      */
     getInputSources() {
         const inputSources = [];
-        // TODO: 
+        // TODO: return input source array.
+
 
         return inputSources;
     }
@@ -571,7 +604,7 @@ export default class NRDevice extends XRDevice {
 
         return mat4.identity(mat4.create());
     }
-    
+
     getEyePoseFromHead(eye) {
         let eyeIndex = -1;
 
@@ -580,7 +613,7 @@ export default class NRDevice extends XRDevice {
         } else if (eye === 'right') {
             eyeIndex = 1;
         }
-        
+
         if (this.provider != null) {
             // matrix4 array 
             const data = JSON.parse(this.provider.getEyePoseFromHead(eyeIndex));
