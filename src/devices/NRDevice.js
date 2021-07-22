@@ -1,16 +1,8 @@
 
 import XRDevice from "./XRDevice";
 import { PRIVATE as XRSESSION_PRIVATE } from '../api/XRSession';
-
-
-
-import {
-    vec3,
-    quat,
-    mat4,
-
-} from 'gl-matrix/src/gl-matrix';
-
+import GamepadXRInputSource from "./GamepadXRInputSource";
+import {vec3,quat,mat4,} from 'gl-matrix/src/gl-matrix';
 
 
 /**
@@ -72,7 +64,7 @@ export default class NRDevice extends XRDevice {
 
     }
 
-    constructor(global) {
+    constructor(global,config = {}) {
         super(global);
         // TODO:
         this.sessions = new Map();
@@ -115,7 +107,9 @@ export default class NRDevice extends XRDevice {
         this.provider = window.nrprovider != undefined ? window.nrprovider : null;
         this._onDeviceConnect();
 
-
+        // controllers
+        this.gamepads = [];
+        this.gamepadInputSources = [];
 
         this.controllerCount = 0;
         this.controllerisTouching = new Array();
@@ -127,6 +121,7 @@ export default class NRDevice extends XRDevice {
 
         this.debugout = true;
 
+        this._initializeControllers(config);
         this.global.prepareForNextFrame = prepareForNextFrame;
     }
 
@@ -301,6 +296,7 @@ export default class NRDevice extends XRDevice {
         // const aspect = width * (this.immersive ? 0.5 : 1.0) / height;
         this.updateFrameData(near, far);
         // TODO: connect input source
+        this._updateGamepadState();
 
         this._debugout(renderState);
 
@@ -488,10 +484,10 @@ export default class NRDevice extends XRDevice {
      * @return {Array<XRInputSource>}
      */
     getInputSources() {
-        const inputSources = [];
-        // TODO: return input source array.
-
-
+        let inputSources = [];
+        for (let i in this.gamepadInputSources) {
+          inputSources.push(this.gamepadInputSources[i].inputSource);
+        }
         return inputSources;
     }
 
@@ -503,8 +499,20 @@ export default class NRDevice extends XRDevice {
      * @param {String} poseType
      * @return {XRPose}
      */
-    getInputPose(inputSource, coordinateSystem, poseType) { throw new Error('Not implemented'); }
+    getInputPose(inputSource, coordinateSystem, poseType) {
 
+        if (!coordinateSystem) {
+            return null;
+          }
+      
+          for (let i in this.gamepadInputSources) {
+            let inputSourceImpl = this.gamepadInputSources[i];
+            if (inputSourceImpl.inputSource === inputSource) {
+              return inputSourceImpl.getXRPose(coordinateSystem, poseType);
+            }
+          }
+          return null;
+    }
     /**
      * Called on window resize.
      */
@@ -590,21 +598,98 @@ export default class NRDevice extends XRDevice {
             this.div.style.zIndex = DIV_Z_INDEX;
         }
     }
-
-    // Interfaces for Nreal SDK.
-
-
-    _getHeadPose() {
-        if (this.provider != null) {
-            const data = JSON.parse(this.provider.getHeadPose());
-
-            var pose = mat4.clone(data);
-            return pose;
+    // create gamepad
+    _createGamepad (id, hand, buttonNum, hasPosition) {
+        const buttons = [];
+        for (let i = 0; i < buttonNum; i++) {
+          buttons.push({
+            pressed: false,
+            touched: false,
+            value: 0.0
+          });
         }
+        return {
+          id: id || '',
+          pose: {
+            hasPosition: hasPosition,
+            position: [0, 0, 0],
+            orientation: [0, 0, 0, 1]
+          },
+          buttons: buttons,
+          hand: hand,
+          mapping: 'xr-standard',
+          axes: [0, 0]
+        };
+      };
 
-        return mat4.identity(mat4.create());
+
+    _initializeControllers(controllerNum) {
+
+        this.gamepads.length = 0;
+        this.gamepadInputSources.length = 0;
+
+        for (let i = 0; i < controllerNum; i++) {
+            this.gamepads.push(createGamepad('NR Controller','right',3,true));
+            const inputSourceImpl = new GamepadXRInputSource(this,{},0,1);
+            inputSourceImpl.active = true;
+            this.gamepadInputSources.push(inputSourceImpl);
+        }
     }
 
+
+    _updateGamepadState(){
+
+        if(this.gamepads.length != g_controller_data.count){
+            this._initializeControllers(g_controller_data.count);
+        }
+
+        for (let i = 0; i < this.gamepads.length;i++){
+            const gamepad = this.gamepads[i];
+            const touched = g_controller_data.data[i][0] === 1;
+            const pressed = g_controller_data.data[i][1] === 1;
+            gamepad.buttons[i].touched = touched;
+            gamepad.buttons[i].pressed = pressed;
+            gamepad.buttons[i].value = pressed?1.0:0.0; 
+            
+            gamepad.pose.position = g_controller_data.data[i].slice(3,6);
+            gamepad.pose.orientation = g_controller_data.data[i].slice(6,10);
+
+            const inputSourceImpl = this.gamepadInputSources[i];
+            inputSourceImpl.updateFromGamepad(gamepad);
+
+
+        if (inputSourceImpl.primaryButtonIndex !== -1) {
+            const primaryActionPressed = gamepad.buttons[inputSourceImpl.primaryButtonIndex].pressed;
+            if (primaryActionPressed && !inputSourceImpl.primaryActionPressed) {
+              // Fire primary action select start event in onEndFrame() for AR device.
+              // See the comment in onEndFrame() for the detail.
+              if (this.arDevice) {
+                inputSourceImpl.active = true;
+              } else {
+                this.dispatchEvent('@@webxr-polyfill/input-select-start', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
+              }
+            } else if (!primaryActionPressed && inputSourceImpl.primaryActionPressed) {
+              if (this.arDevice) {
+                inputSourceImpl.active = false;
+              }
+              this.dispatchEvent('@@webxr-polyfill/input-select-end', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
+            }
+            // imputSourceImpl.primaryActionPressed is updated in onFrameEnd().
+          }
+          if (inputSourceImpl.primarySqueezeButtonIndex !== -1) {
+            const primarySqueezeActionPressed = gamepad.buttons[inputSourceImpl.primarySqueezeButtonIndex].pressed;
+            if (primarySqueezeActionPressed && !inputSourceImpl.primarySqueezeActionPressed) {
+              this.dispatchEvent('@@webxr-polyfill/input-squeeze-start', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
+            } else if (!primarySqueezeActionPressed && inputSourceImpl.primarySqueezeActionPressed) {
+              this.dispatchEvent('@@webxr-polyfill/input-squeeze-end', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
+            }
+            inputSourceImpl.primarySqueezeActionPressed = primarySqueezeActionPressed;
+          }
+        }
+    }
+
+
+    // Interfaces for Nreal SDK.
     getEyePoseFromHead(eye) {
         let eyeIndex = -1;
 
