@@ -34,7 +34,6 @@ var g_frame_data_state = 0;
 var g_frame_data_count = 0;
 var g_controller_data = "";
 function prepareForNextFrame(frame_data) {
-    console.log("prepareForNextFrame " + frame_data);
 
     var jsonObject = JSON.parse(frame_data);
 
@@ -113,15 +112,17 @@ export default class NRDevice extends XRDevice {
 
         this.controllerCount = 0;
         this.controllerisTouching = new Array();
-        this.controllerisButtonDown = new Array();
-        this.controllerisButtonUp = new Array();
-        this.controllerRay = new Array();
+        this.controllerisHomeButtons = new Array();
+        this.controllerisConfirmButtons = new Array();
+        this.controllerRays = new Array();
+        this.touchpads = new Array();
 
 
 
         this.debugout = true;
 
-        this._initializeControllers(config);
+        // FIXME: config from data source.
+        this._initializeControllers(1);
         this.global.prepareForNextFrame = prepareForNextFrame;
     }
 
@@ -230,24 +231,18 @@ export default class NRDevice extends XRDevice {
                 return t_this.global.requestAnimationFrame(callback);
             } else if (g_frame_data_state == 1) {
                 g_frame_data_state = 0;
-                console.log("call callback " + g_frame_data_count);
+                // console.log("call callback " + g_frame_data_count);
                 t_this.poseMatrix = mat4.clone(g_frame_data);
 
                 if (g_controller_data) {
                     t_this.controllerCount = g_controller_data.count;
                     for (var i = 0; i < t_this.controllerCount; i++) {
                         t_this.controllerisTouching[i] = g_controller_data.data[i][0];
-                        t_this.controllerisButtonDown[i] = g_controller_data.data[i][1];
-                        t_this.controllerisButtonUp[i] = g_controller_data.data[i][2];
-                        t_this.controllerRay[0] = g_controller_data.data[i][3];
-                        t_this.controllerRay[1] = g_controller_data.data[i][4];
-                        t_this.controllerRay[2] = g_controller_data.data[i][5];
-                        t_this.controllerRay[3] = g_controller_data.data[i][6];
-                        t_this.controllerRay[4] = g_controller_data.data[i][7];
-                        t_this.controllerRay[5] = g_controller_data.data[i][8];
-                        t_this.controllerRay[6] = g_controller_data.data[i][9];
-
-                        console.log("call controllerisTouching " + t_this.controllerisTouching[i]);
+                        t_this.controllerisConfirmButtons[i] = g_controller_data.data[i][1];
+                        t_this.controllerisHomeButtons[i] = g_controller_data.data[i][2];
+                        t_this.controllerRays[i] = g_controller_data.data[i].slice(3,10);
+                        t_this.touchpads[i] = [(g_controller_data.data[i][10] - 0.5) *2,(g_controller_data.data[i][11] - 0.5) *2];
+                        // console.log("call controllerisTouching " + t_this.controllerisTouching[i]);
                     }
                 }
                 callback();
@@ -292,11 +287,11 @@ export default class NRDevice extends XRDevice {
             context.clearColor(currentClearColor[0], currentClearColor[1], currentClearColor[2], currentClearColor[3]);
             context.clearDepth(currentClearDepth);
             context.clearStencil(currentClearStencil);
+        // connect input source
+        this._updateGamepadState(sessionId);
         }
         // const aspect = width * (this.immersive ? 0.5 : 1.0) / height;
         this.updateFrameData(near, far);
-        // TODO: connect input source
-        this._updateGamepadState();
 
         this._debugout(renderState);
 
@@ -618,7 +613,7 @@ export default class NRDevice extends XRDevice {
           buttons: buttons,
           hand: hand,
           mapping: 'xr-standard',
-          axes: [0, 0]
+          axes: [0,0]
         };
       };
 
@@ -629,7 +624,7 @@ export default class NRDevice extends XRDevice {
         this.gamepadInputSources.length = 0;
 
         for (let i = 0; i < controllerNum; i++) {
-            this.gamepads.push(createGamepad('NR Controller','right',3,true));
+            this.gamepads.push(this._createGamepad('NR Controller','right',3,true));
             const inputSourceImpl = new GamepadXRInputSource(this,{},0,1);
             inputSourceImpl.active = true;
             this.gamepadInputSources.push(inputSourceImpl);
@@ -637,54 +632,50 @@ export default class NRDevice extends XRDevice {
     }
 
 
-    _updateGamepadState(){
+    _updateGamepadState(sessionId){
 
-        if(this.gamepads.length != g_controller_data.count){
-            this._initializeControllers(g_controller_data.count);
-        }
+        // if(this.gamepads.length != g_controller_data.count){
+        //     this._initializeControllers(g_controller_data.count);
+        // }
 
         for (let i = 0; i < this.gamepads.length;i++){
-            const gamepad = this.gamepads[i];
-            const touched = g_controller_data.data[i][0] === 1;
-            const pressed = g_controller_data.data[i][1] === 1;
+            let gamepad = this.gamepads[i];
+            let data = g_controller_data.data[i];
+            let touched = data[0] === 1;
+            let pressed = data[1] === 1;
             gamepad.buttons[i].touched = touched;
             gamepad.buttons[i].pressed = pressed;
             gamepad.buttons[i].value = pressed?1.0:0.0; 
             
-            gamepad.pose.position = g_controller_data.data[i].slice(3,6);
-            gamepad.pose.orientation = g_controller_data.data[i].slice(6,10);
+            gamepad.pose.position = data.slice(3,6);
+            gamepad.pose.orientation = data.slice(6,10);
+            gamepad.axes = [data[10],data[11]]
 
-            const inputSourceImpl = this.gamepadInputSources[i];
+            let inputSourceImpl = this.gamepadInputSources[i];
             inputSourceImpl.updateFromGamepad(gamepad);
 
-
-        if (inputSourceImpl.primaryButtonIndex !== -1) {
-            const primaryActionPressed = gamepad.buttons[inputSourceImpl.primaryButtonIndex].pressed;
-            if (primaryActionPressed && !inputSourceImpl.primaryActionPressed) {
-              // Fire primary action select start event in onEndFrame() for AR device.
-              // See the comment in onEndFrame() for the detail.
-              if (this.arDevice) {
-                inputSourceImpl.active = true;
-              } else {
-                this.dispatchEvent('@@webxr-polyfill/input-select-start', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
+            this.gamepadInputSources
+            // Process the primary action for the controller
+            if (inputSourceImpl.primaryButtonIndex != -1) {
+              let primaryActionPressed = gamepad.buttons[inputSourceImpl.primaryButtonIndex].pressed;
+              if (primaryActionPressed && !inputSourceImpl.primaryActionPressed) {
+                this.dispatchEvent('@@webxr-polyfill/input-select-start', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
+              } else if (!primaryActionPressed && inputSourceImpl.primaryActionPressed) {
+                // This will also fire a select event
+                this.dispatchEvent('@@webxr-polyfill/input-select-end', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
               }
-            } else if (!primaryActionPressed && inputSourceImpl.primaryActionPressed) {
-              if (this.arDevice) {
-                inputSourceImpl.active = false;
+              inputSourceImpl.primaryActionPressed = primaryActionPressed;
+            }
+            if (inputSourceImpl.primarySqueezeButtonIndex != -1) {
+              let primarySqueezeActionPressed = gamepad.buttons[inputSourceImpl.primarySqueezeButtonIndex].pressed;
+              if (primarySqueezeActionPressed && !inputSourceImpl.primarySqueezeActionPressed) {
+                this.dispatchEvent('@@webxr-polyfill/input-squeeze-start', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
+              } else if (!primarySqueezeActionPressed && inputSourceImpl.primarySqueezeActionPressed) {
+                // This will also fire a select event
+                this.dispatchEvent('@@webxr-polyfill/input-squeeze-end', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
               }
-              this.dispatchEvent('@@webxr-polyfill/input-select-end', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
+              inputSourceImpl.primarySqueezeActionPressed = primarySqueezeActionPressed;
             }
-            // imputSourceImpl.primaryActionPressed is updated in onFrameEnd().
-          }
-          if (inputSourceImpl.primarySqueezeButtonIndex !== -1) {
-            const primarySqueezeActionPressed = gamepad.buttons[inputSourceImpl.primarySqueezeButtonIndex].pressed;
-            if (primarySqueezeActionPressed && !inputSourceImpl.primarySqueezeActionPressed) {
-              this.dispatchEvent('@@webxr-polyfill/input-squeeze-start', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
-            } else if (!primarySqueezeActionPressed && inputSourceImpl.primarySqueezeActionPressed) {
-              this.dispatchEvent('@@webxr-polyfill/input-squeeze-end', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
-            }
-            inputSourceImpl.primarySqueezeActionPressed = primarySqueezeActionPressed;
-          }
         }
     }
 
