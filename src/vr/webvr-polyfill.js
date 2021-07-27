@@ -1,6 +1,6 @@
 import { vec3, mat4, mat3 } from 'gl-matrix/src/gl-matrix';
 
-function injectedWebvrPolyfill() {
+function injectWebvrPolyfill() {
 
 	'use strict';
 	var NrealLight = {
@@ -537,4 +537,4 @@ function injectedWebvrPolyfill() {
 }
 
 
-export default injectedWebvrPolyfill;
+export default injectWebvrPolyfill;
