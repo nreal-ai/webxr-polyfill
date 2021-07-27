@@ -117,6 +117,8 @@ export default class NRDevice extends XRDevice {
         this.controllerRays = new Array();
         this.touchpads = new Array();
 
+        this.armLength = 0.5;
+
 
 
         this.debugout = true;
@@ -231,7 +233,6 @@ export default class NRDevice extends XRDevice {
                 return t_this.global.requestAnimationFrame(callback);
             } else if (g_frame_data_state == 1) {
                 g_frame_data_state = 0;
-                // console.log("call callback " + g_frame_data_count);
                 t_this.poseMatrix = mat4.clone(g_frame_data);
 
                 if (g_controller_data) {
@@ -242,7 +243,6 @@ export default class NRDevice extends XRDevice {
                         t_this.controllerisHomeButtons[i] = g_controller_data.data[i][2];
                         t_this.controllerRays[i] = g_controller_data.data[i].slice(3,10);
                         t_this.touchpads[i] = [(g_controller_data.data[i][10] - 0.5) *2,(g_controller_data.data[i][11] - 0.5) *2];
-                        // console.log("call controllerisTouching " + t_this.controllerisTouching[i]);
                     }
                 }
                 callback();
@@ -632,6 +632,9 @@ export default class NRDevice extends XRDevice {
     }
 
 
+
+
+
     _updateGamepadState(sessionId){
 
         // if(this.gamepads.length != g_controller_data.count){
@@ -643,13 +646,32 @@ export default class NRDevice extends XRDevice {
             let data = g_controller_data.data[i];
             let touched = data[0] === 1;
             let pressed = data[1] === 1;
+
+            if(touched && Math.abs(gamepad.axes[1] ) > 0.01 ){
+               let offset = data[11] - gamepad.axes[1];
+                this.armLength += offset ;
+                this.armLength = Math.max(0.1,Math.min(2,this.armLength));
+            }
+
+
+
+
             gamepad.buttons[i].touched = touched;
             gamepad.buttons[i].pressed = pressed;
             gamepad.buttons[i].value = pressed?1.0:0.0; 
             
-            gamepad.pose.position = data.slice(3,6);
+            gamepad.pose.position =   data.slice(3,6);
             gamepad.pose.orientation = data.slice(6,10);
             gamepad.axes = [data[10],data[11]]
+
+
+
+            let arm = vec3.fromValues(0,0,-this.armLength);
+            vec3.transformQuat(arm,arm,gamepad.pose.orientation);
+            vec3.add(gamepad.pose.position,gamepad.pose.position,arm);
+
+            
+
 
             let inputSourceImpl = this.gamepadInputSources[i];
             inputSourceImpl.updateFromGamepad(gamepad);
