@@ -22,7 +22,6 @@ import {
 import { isImageBitmapSupported, isMobile } from './utils';
 import { requestXRDevice } from './devices';
 
-import WebVRPolyfill from './vr/webvr_patch.js';
 
 import injectWebvrPolyfill from './vr/webvr-polyfill';
 

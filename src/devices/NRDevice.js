@@ -2,7 +2,9 @@
 import XRDevice from "./XRDevice";
 import { PRIVATE as XRSESSION_PRIVATE } from '../api/XRSession';
 import GamepadXRInputSource from "./GamepadXRInputSource";
-import {vec3,quat,mat4,} from 'gl-matrix/src/gl-matrix';
+import { vec3, quat, mat4, } from 'gl-matrix/src/gl-matrix';
+
+import NrealBridge from '../nreal/NrealBridge';
 
 
 /**
@@ -27,60 +29,15 @@ class Session {
 
 
 const DIV_Z_INDEX = '9999';
-
-
-var g_frame_data = "";
-var g_frame_data_state = 0;
-var g_frame_data_count = 0;
-var g_controller_data = "";
-function prepareForNextFrame(frame_data) {
-
-    var jsonObject = JSON.parse(frame_data);
-
-    g_frame_data = jsonObject.headpose;
-    g_controller_data = jsonObject.controller;
-
-    g_frame_data_state = 1;
-    g_frame_data_count++;
-}
-
 export default class NRDevice extends XRDevice {
 
-    _onDeviceConnect() {
 
-        const near = 0.01;
-        const far = 1000;
-
-        let fov = this.getEyeFov('left')
-        mat4.frustum(this.leftProjectionMatrix, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
-        fov = this.getEyeFov('right')
-        mat4.frustum(this.rightProjectionMatrix, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
-
-        this.eyeOffset = {
-            left: this.getEyePoseFromHead('left'),
-            right: this.getEyePoseFromHead('right'),
-        };
-
-    }
-
-    constructor(global,config = {}) {
+    constructor(global, config = {}) {
         super(global);
         // TODO:
         this.sessions = new Map();
         this.modes = ['inline', 'immersive-vr', 'immersive-ar'];
         this.features = ['viewer', 'local'];
-
-
-        // headset pose
-        this.poseMatrix = mat4.create();
-        mat4.fromTranslation(this.poseMatrix, vec3.fromValues(0, 1.0, 0));
-
-        // projection 
-        this.leftProjectionMatrix = mat4.create();
-        this.rightProjectionMatrix = mat4.create();
-        // view matrix
-        this.leftViewMatrix = mat4.create();
-        this.rightViewMatrix = mat4.create();
 
         // @TODO: Edit this comment
         // For case where baseLayer's canvas isn't in document.body
@@ -98,34 +55,15 @@ export default class NRDevice extends XRDevice {
             height: 0
         };
 
-        this.eyeOffset = {
-            left: mat4.create(),
-            right: mat4.create(),
-        };
-
-        this.provider = window.nrprovider != undefined ? window.nrprovider : null;
-        this._onDeviceConnect();
 
         // controllers
-        this.gamepads = [];
         this.gamepadInputSources = [];
-
-        this.controllerCount = 0;
-        this.controllerisTouching = new Array();
-        this.controllerisHomeButtons = new Array();
-        this.controllerisConfirmButtons = new Array();
-        this.controllerRays = new Array();
-        this.touchpads = new Array();
-
-        this.armLength = 0.5;
 
 
 
         this.debugout = true;
 
-        // FIXME: config from data source.
-        this._initializeControllers(1);
-        this.global.prepareForNextFrame = prepareForNextFrame;
+        this.bridge = new NrealBridge(global);
     }
 
 
@@ -227,30 +165,15 @@ export default class NRDevice extends XRDevice {
      * @return {Function}
      */
     requestAnimationFrame(callback) {
-        var t_this = this;
-        setTimeout(function () {
-            if (t_this.provider == undefined) {
-                return t_this.global.requestAnimationFrame(callback);
-            } else if (g_frame_data_state == 1) {
-                g_frame_data_state = 0;
-                t_this.poseMatrix = mat4.clone(g_frame_data);
-
-                if (g_controller_data) {
-                    t_this.controllerCount = g_controller_data.count;
-                    for (var i = 0; i < t_this.controllerCount; i++) {
-                        t_this.controllerisTouching[i] = g_controller_data.data[i][0];
-                        t_this.controllerisConfirmButtons[i] = g_controller_data.data[i][1];
-                        t_this.controllerisHomeButtons[i] = g_controller_data.data[i][2];
-                        t_this.controllerRays[i] = g_controller_data.data[i].slice(3,10);
-                        t_this.touchpads[i] = [(g_controller_data.data[i][10] - 0.5) *2,(g_controller_data.data[i][11] - 0.5) *2];
-                    }
-                }
-                callback();
-            } else {
-                t_this.requestAnimationFrame(callback);
-            }
-        }, 1);
-        return 100;
+        let result = this.bridge.requestUpdate();
+        if (result == -1) {
+            setTimeout(this.requestAnimationFrame(callback), 1);
+        } else if (result == 0) {
+            return this.global.requestAnimationFrame(callback);
+        } else {
+            callback();
+            return 100;
+        }
     }
 
     /**
@@ -287,24 +210,11 @@ export default class NRDevice extends XRDevice {
             context.clearColor(currentClearColor[0], currentClearColor[1], currentClearColor[2], currentClearColor[3]);
             context.clearDepth(currentClearDepth);
             context.clearStencil(currentClearStencil);
-        // connect input source
-        this._updateGamepadState(sessionId);
+            // connect input source
+            this._updateGamepadState(sessionId);
         }
-        // const aspect = width * (this.immersive ? 0.5 : 1.0) / height;
-        this.updateFrameData(near, far);
-
-        this._debugout(renderState);
 
     }
-
-
-    updateFrameData(near, far) {
-        // setup view matrix
-        mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.poseMatrix, this.eyeOffset.left));
-        mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.poseMatrix, this.eyeOffset.right));
-
-    }
-
     /**
      * @param {number} sessionId
      */
@@ -357,6 +267,7 @@ export default class NRDevice extends XRDevice {
      * @return {Promise<XRFrameOfReference>}
      */
     async requestFrameOfReferenceTransform(type, options) {
+        // TODO: imp
         return undefined;
     }
 
@@ -439,9 +350,9 @@ export default class NRDevice extends XRDevice {
      */
     getProjectionMatrix(eye, viewIndex) {
         if (eye === 'left' || eye === 'none') {
-            return this.leftProjectionMatrix;
+            return this.bridge.leftProjectionMatrix;
         } else if (eye === 'right') {
-            return this.rightProjectionMatrix;
+            return this.bridge.rightProjectionMatrix;
         } else {
             throw new Error(`eye must be of type 'left' , 'right' or 'none'`);
         }
@@ -454,7 +365,7 @@ export default class NRDevice extends XRDevice {
      */
     getBasePoseMatrix() {
         // TODO:
-        return this.poseMatrix;
+        return this.bridge.poseMatrix;
     }
 
     /**
@@ -465,9 +376,9 @@ export default class NRDevice extends XRDevice {
      */
     getBaseViewMatrix(eye) {
         if (eye === 'left' || eye === 'none') {
-            return this.leftViewMatrix;
+            return this.bridge.leftViewMatrix;
         } else if (eye === 'right') {
-            return this.rightViewMatrix;
+            return this.bridge.rightViewMatrix;
         } else {
             throw new Error(`eye must be of type 'left' , 'right' or 'none'`);
         }
@@ -481,7 +392,7 @@ export default class NRDevice extends XRDevice {
     getInputSources() {
         let inputSources = [];
         for (let i in this.gamepadInputSources) {
-          inputSources.push(this.gamepadInputSources[i].inputSource);
+            inputSources.push(this.gamepadInputSources[i].inputSource);
         }
         return inputSources;
     }
@@ -498,15 +409,15 @@ export default class NRDevice extends XRDevice {
 
         if (!coordinateSystem) {
             return null;
-          }
-      
-          for (let i in this.gamepadInputSources) {
+        }
+
+        for (let i in this.gamepadInputSources) {
             let inputSourceImpl = this.gamepadInputSources[i];
             if (inputSourceImpl.inputSource === inputSource) {
-              return inputSourceImpl.getXRPose(coordinateSystem, poseType);
+                return inputSourceImpl.getXRPose(coordinateSystem, poseType);
             }
-          }
-          return null;
+        }
+        return null;
     }
     /**
      * Called on window resize.
@@ -593,166 +504,45 @@ export default class NRDevice extends XRDevice {
             this.div.style.zIndex = DIV_Z_INDEX;
         }
     }
-    // create gamepad
-    _createGamepad (id, hand, buttonNum, hasPosition) {
-        const buttons = [];
-        for (let i = 0; i < buttonNum; i++) {
-          buttons.push({
-            pressed: false,
-            touched: false,
-            value: 0.0
-          });
-        }
-        return {
-          id: id || '',
-          pose: {
-            hasPosition: hasPosition,
-            position: [0, 0, 0],
-            orientation: [0, 0, 0, 1]
-          },
-          buttons: buttons,
-          hand: hand,
-          mapping: 'xr-standard',
-          axes: [0,0]
-        };
-      };
 
+    _updateGamepadState(sessionId) {
 
-    _initializeControllers(controllerNum) {
-
-        this.gamepads.length = 0;
-        this.gamepadInputSources.length = 0;
-
-        for (let i = 0; i < controllerNum; i++) {
-            this.gamepads.push(this._createGamepad('NR Controller','right',3,true));
-            const inputSourceImpl = new GamepadXRInputSource(this,{},0,1);
-            inputSourceImpl.active = true;
-            this.gamepadInputSources.push(inputSourceImpl);
-        }
-    }
-
-
-
-
-
-    _updateGamepadState(sessionId){
-
-        // if(this.gamepads.length != g_controller_data.count){
-        //     this._initializeControllers(g_controller_data.count);
-        // }
-
-        for (let i = 0; i < this.gamepads.length;i++){
-            let gamepad = this.gamepads[i];
-            let data = g_controller_data.data[i];
-            let touched = data[0] === 1;
-            let pressed = data[1] === 1;
-
-            if(touched && Math.abs(gamepad.axes[1] ) > 0.01 ){
-               let offset = data[11] - gamepad.axes[1];
-                this.armLength += offset ;
-                this.armLength = Math.max(0.1,Math.min(2,this.armLength));
+        // if xr input sources mismatch with the gamepads
+        if (this.gamepadInputSources.length != this.bridge.gamepads.length) {
+            this.gamepadInputSources.length = 0;
+            for (let i = 0; i < this.bridge.gamepads.length; i++) {
+                const inputSourceImpl = new GamepadXRInputSource(this, {}, 0, 1);
+                inputSourceImpl.active = true;
+                this.gamepadInputSources.push(inputSourceImpl);
             }
-
-
-
-
-            gamepad.buttons[i].touched = touched;
-            gamepad.buttons[i].pressed = pressed;
-            gamepad.buttons[i].value = pressed?1.0:0.0; 
-            
-            gamepad.pose.position =   data.slice(3,6);
-            gamepad.pose.orientation = data.slice(6,10);
-            gamepad.axes = [data[10],data[11]]
-
-
-
-            let arm = vec3.fromValues(0,0,-this.armLength);
-            vec3.transformQuat(arm,arm,gamepad.pose.orientation);
-            vec3.add(gamepad.pose.position,gamepad.pose.position,arm);
-
-            
-
+        }
+        for (let i = 0; i < this.gamepads.length; i++) {
+            let gamepad = this.gamepads[i];
 
             let inputSourceImpl = this.gamepadInputSources[i];
             inputSourceImpl.updateFromGamepad(gamepad);
-
-            this.gamepadInputSources
             // Process the primary action for the controller
             if (inputSourceImpl.primaryButtonIndex != -1) {
-              let primaryActionPressed = gamepad.buttons[inputSourceImpl.primaryButtonIndex].pressed;
-              if (primaryActionPressed && !inputSourceImpl.primaryActionPressed) {
-                this.dispatchEvent('@@webxr-polyfill/input-select-start', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
-              } else if (!primaryActionPressed && inputSourceImpl.primaryActionPressed) {
-                // This will also fire a select event
-                this.dispatchEvent('@@webxr-polyfill/input-select-end', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
-              }
-              inputSourceImpl.primaryActionPressed = primaryActionPressed;
+                let primaryActionPressed = gamepad.buttons[inputSourceImpl.primaryButtonIndex].pressed;
+                if (primaryActionPressed && !inputSourceImpl.primaryActionPressed) {
+                    this.dispatchEvent('@@webxr-polyfill/input-select-start', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
+                } else if (!primaryActionPressed && inputSourceImpl.primaryActionPressed) {
+                    // This will also fire a select event
+                    this.dispatchEvent('@@webxr-polyfill/input-select-end', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
+                }
+                inputSourceImpl.primaryActionPressed = primaryActionPressed;
             }
             if (inputSourceImpl.primarySqueezeButtonIndex != -1) {
-              let primarySqueezeActionPressed = gamepad.buttons[inputSourceImpl.primarySqueezeButtonIndex].pressed;
-              if (primarySqueezeActionPressed && !inputSourceImpl.primarySqueezeActionPressed) {
-                this.dispatchEvent('@@webxr-polyfill/input-squeeze-start', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
-              } else if (!primarySqueezeActionPressed && inputSourceImpl.primarySqueezeActionPressed) {
-                // This will also fire a select event
-                this.dispatchEvent('@@webxr-polyfill/input-squeeze-end', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
-              }
-              inputSourceImpl.primarySqueezeActionPressed = primarySqueezeActionPressed;
+                let primarySqueezeActionPressed = gamepad.buttons[inputSourceImpl.primarySqueezeButtonIndex].pressed;
+                if (primarySqueezeActionPressed && !inputSourceImpl.primarySqueezeActionPressed) {
+                    this.dispatchEvent('@@webxr-polyfill/input-squeeze-start', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
+                } else if (!primarySqueezeActionPressed && inputSourceImpl.primarySqueezeActionPressed) {
+                    // This will also fire a select event
+                    this.dispatchEvent('@@webxr-polyfill/input-squeeze-end', { sessionId: sessionId, inputSource: inputSourceImpl.inputSource });
+                }
+                inputSourceImpl.primarySqueezeActionPressed = primarySqueezeActionPressed;
             }
         }
-    }
-
-
-    // Interfaces for Nreal SDK.
-    getEyePoseFromHead(eye) {
-        let eyeIndex = -1;
-
-        if (eye === 'left' || eye === 'none') {
-            eyeIndex = 0;
-        } else if (eye === 'right') {
-            eyeIndex = 1;
-        }
-
-        if (this.provider != null) {
-            // matrix4 array 
-            const data = JSON.parse(this.provider.getEyePoseFromHead(eyeIndex));
-            return mat4.clone(data);
-        }
-        return mat4.identity(mat4.create());
-    }
-
-    getEyeFov(eye) {
-        let eyeIndex = -1;
-        if (eye === 'left' || eye === 'none') {
-            eyeIndex = 0;
-        } else if (eye === 'right') {
-            eyeIndex = 1;
-        }
-        if (this.provider != null) {
-            // float4 array, tangent values of the 
-            var val = JSON.parse(this.provider.getEyeFov(eyeIndex));
-            val[0] = -val[0];
-            val[3] = -val[3];
-            // sort to left,right,bottom,top
-            const bottom = val[3];
-            val[3] = val[2];
-            val[2] = bottom;
-
-
-            return val;
-        }
-        return [-1, 1, -1, 1];
-    }
-
-    _debugout(renderState) {
-        if (!this.debugout) {
-            return;
-        }
-        this.debugout = false;
-        console.log('renderState=' + renderState);
-
-        console.log('pose matrix=' + this.poseMatrix);
-        console.log('projection matrix=' + this.leftProjectionMatrix);
-        console.log('view matrix=' + this.leftViewMatrix);
     }
 }
 
