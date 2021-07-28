@@ -50,7 +50,7 @@ export const requestXRDevice = async function (global, config) {
 
   // Check for force use nreal device.
   if (config.forceNreal){
-    console.log('force to use nreal devices.');
+    console.log('force to use nreal xr devices.');
     return new NRDevice(global);
   }
 

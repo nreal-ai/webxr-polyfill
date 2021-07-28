@@ -1,4 +1,5 @@
-import { mat4 } from "gl-matrix/src/gl-matrix";
+import {vec3, mat4 } from "gl-matrix/src/gl-matrix";
+import GLOBAL from '../lib/global';
 
 // {
 //     "headpose": float[16],
@@ -36,9 +37,11 @@ var Eye = {
 
 export default class NrealBridge {
 
-    constructor(global) {
-        this.global = global;
+    constructor() {
         this.provider = window.nrprovider != undefined ? window.nrprovider : null;
+        window.prepareForNextFrame = prepareForNextFrame;
+
+
         this.fieldOfView = {
             left: this._getEyeFov(Eye.LEFT),
             right: this._getEyeFov(Eye.RIGHT)
@@ -49,10 +52,9 @@ export default class NrealBridge {
             right: this._getEyePoseFromHead(Eye.RIGHT)
         }
 
-        this.poseMatrix = mat4.create();
+        this.headPose = mat4.create();
         this.gamepads = [];
-        this.armLenght = 0.5;
-        this.global.prepareForNextFrame = prepareForNextFrame;
+        this.armLength = 0.5;
 
 
         this.near = 0.01;
@@ -65,12 +67,12 @@ export default class NrealBridge {
         this.rightProjectionMatrix = mat4.create();
 
         this._initializeProjectionMatrix(this.leftProjectionMatrix,
-            this.fieldOfView.left,this.near,this.far);
+            this.fieldOfView.left, this.near, this.far);
         this._initializeProjectionMatrix(this.rightProjectionMatrix,
-            this.fieldOfView.right,this.near,this.far);
+            this.fieldOfView.right, this.near, this.far);
     }
 
-    _initializeProjectionMatrix(out, fov,near,far){
+    _initializeProjectionMatrix(out, fov, near, far) {
         mat4.frustum(out, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
     }
 
@@ -78,16 +80,18 @@ export default class NrealBridge {
         if (this.provider === undefined) {
             return 0;
         }
+
+        console.log('requestUpdate:' + g_frame_data_state);
         if (g_frame_data_state != 1) {
             return -1;
         }
 
         g_frame_data_state = 0;
-        this.poseMatrix = mat4.clone(g_frame_data);
+        this.headPose = mat4.clone(g_frame_data);
 
-        // setup view matrix
-        mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.poseMatrix, this.eyeOffset.left));
-        mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.poseMatrix, this.eyeOffset.right));
+        // update view matrix
+        mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.headPose, this.eyeOffset.left));
+        mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.headPose, this.eyeOffset.right));
 
 
         if (this.gamepads.length != g_controller_data.count) {
@@ -126,8 +130,6 @@ export default class NrealBridge {
 
     _initializeControllers(controllerNum) {
         this.gamepads.length = 0;
-        this.gamepadInputSources.length = 0;
-
         for (let i = 0; i < controllerNum; i++) {
             // FIXME: dual hands support
             this.gamepads.push(this._createGamepad('NR Controller', 'right', 3, true));
@@ -157,15 +159,6 @@ export default class NrealBridge {
             axes: [0, 0]
         };
     };
-
-    // for webxr call
-    updateViewMatrix(){
-        mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.poseMatrix, this.eyeOffset.left));
-        mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.poseMatrix, this.eyeOffset.right));
-    }
-
-
-
 
 
     // Interfaces for Nreal SDK.
@@ -207,5 +200,43 @@ export default class NrealBridge {
             return val;
         }
         return [-1, 1, -1, 1];
+    }
+
+
+    // for webvr dataset
+
+    updateVrEyeParameters(parameters, eye) {
+        const toDegree = 180 / Math.PI;
+        const count = 4;
+        let degrees = new Float32Array(count);
+        let isLeft = eye === Eye.left;
+        let fov = isLeft ? this.fieldOfView.left : this.fieldOfView.right;
+        for (let i = 0; i < count; i++) {
+            degrees[i] = Math.abs(Math.atan(fov[i]) * toDegree);
+        }
+
+        parameters.fieldOfView.leftDegrees = degrees[0];
+        parameters.fieldOfView.rightDegrees = degrees[1];
+        parameters.fieldOfView.downDegrees = degrees[2];
+        parameters.fieldOfView.upDegrees = degrees[3];
+
+        mat4.getTranslation(parameters.offset, isLeft ? this.eyeOffset.left : this.eyeOffset.right);
+    }
+
+
+    updateVrPose(pose){
+        mat4.getTranslation(pose.position,this.headPose);
+        mat4.getRotation(pose.orientation,this.headPose);
+    }
+
+
+    updateVrFrameData(frameData){
+        frameData.leftProjectionMatrix = this.leftProjectionMatrix;
+        frameData.leftViewMatrix = this.leftViewMatrix;
+        frameData.rightProjectionMatrix = this.rightProjectionMatrix;
+        frameData.rightViewMatrix = this.rightViewMatrix;
+        frameData.pose = this.headPose;
+
+        return true;
     }
 }

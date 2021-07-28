@@ -56,14 +56,15 @@ export default class NRDevice extends XRDevice {
         };
 
 
+        this.bridge = new NrealBridge();
         // controllers
         this.gamepadInputSources = [];
-
+        const inputSourceImpl = new GamepadXRInputSource(this, {}, 0, 1);
+        inputSourceImpl.active = true;
+        this.gamepadInputSources.push(inputSourceImpl);
 
 
         this.debugout = true;
-
-        this.bridge = new NrealBridge(global);
     }
 
 
@@ -167,7 +168,7 @@ export default class NRDevice extends XRDevice {
     requestAnimationFrame(callback) {
         let result = this.bridge.requestUpdate();
         if (result == -1) {
-            setTimeout(this.requestAnimationFrame(callback), 1);
+         return  setTimeout(this.requestAnimationFrame(callback), 1);
         } else if (result == 0) {
             return this.global.requestAnimationFrame(callback);
         } else {
@@ -365,7 +366,7 @@ export default class NRDevice extends XRDevice {
      */
     getBasePoseMatrix() {
         // TODO:
-        return this.bridge.poseMatrix;
+        return this.bridge.headPose;
     }
 
     /**
@@ -516,8 +517,8 @@ export default class NRDevice extends XRDevice {
                 this.gamepadInputSources.push(inputSourceImpl);
             }
         }
-        for (let i = 0; i < this.gamepads.length; i++) {
-            let gamepad = this.gamepads[i];
+        for (let i = 0; i < this.bridge.gamepads.length; i++) {
+            let gamepad = this.bridge.gamepads[i];
 
             let inputSourceImpl = this.gamepadInputSources[i];
             inputSourceImpl.updateFromGamepad(gamepad);
