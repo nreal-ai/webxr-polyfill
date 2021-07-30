@@ -19,6 +19,8 @@ var g_frame_data_count = 0;
 var g_controller_data = "";
 function prepareForNextFrame(frame_data) {
 
+    // console.log('prepareForNextFrame');
+
     var jsonObject = JSON.parse(frame_data);
 
     g_frame_data = jsonObject.headpose;
@@ -34,6 +36,8 @@ var Eye = {
     RIGHT: 'right',
     NONE: 'none'
 };
+var startDate = Date.now();
+var startPerfNow = performance.now();
 
 export default class NrealBridge {
 
@@ -81,8 +85,8 @@ export default class NrealBridge {
             return 0;
         }
 
-        console.log('requestUpdate:' + g_frame_data_state);
-        if (g_frame_data_state != 1) {
+        // console.log('requestUpdate:' + g_frame_data_state);
+        if (g_frame_data_state === 0) {
             return -1;
         }
 
@@ -100,6 +104,9 @@ export default class NrealBridge {
 
         for (let i = 0; i < this.gamepads.length; i++) {
             let gamepad = this.gamepads[i];
+            gamepad.timestamp= startDate + (performance.now() - startPerfNow) 
+
+
             let data = g_controller_data.data[i];
             let touched = data[0] === 1;
             let pressed = data[1] === 1;
@@ -117,10 +124,11 @@ export default class NrealBridge {
             gamepad.pose.position = data.slice(3, 6);
             gamepad.pose.orientation = data.slice(6, 10);
             gamepad.axes = [data[10], data[11]]
-
             let arm = vec3.fromValues(0, 0, -this.armLength);
             vec3.transformQuat(arm, arm, gamepad.pose.orientation);
             vec3.add(gamepad.pose.position, gamepad.pose.position, arm);
+
+
         }
 
         return 1;
@@ -156,7 +164,8 @@ export default class NrealBridge {
             buttons: buttons,
             hand: hand,
             mapping: 'xr-standard',
-            axes: [0, 0]
+            axes: [0, 0],
+            timestamp: startDate + (performance.now() - startPerfNow) 
         };
     };
 

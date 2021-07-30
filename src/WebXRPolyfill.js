@@ -23,7 +23,7 @@ import { isImageBitmapSupported, isMobile } from './utils';
 import { requestXRDevice } from './devices';
 
 
-import injectWebvrPolyfill from './vr/webvr-polyfill';
+import injectWebvrPolyfill from './nreal/webvr-polyfill';
 
 const CONFIG_DEFAULTS = {
   // The default global to use for needed APIs.
@@ -73,6 +73,12 @@ export default class WebXRPolyfill {
     if(this.config.webvrCompatible){
 
       injectWebvrPolyfill();
+
+      //fake orientation
+      Object.defineProperty(window, 'orientation', {
+        value: 90,
+        configurable: true,
+    });
     }
   }
 

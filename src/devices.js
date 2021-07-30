@@ -15,7 +15,7 @@
 
 import CardboardXRDevice from './devices/CardboardXRDevice';
 import InlineDevice from './devices/InlineDevice';
-import NRDevice from './devices/NRDevice';
+import NRDevice from './nreal/NRDevice';
 import WebVRDevice from './devices/WebVRDevice';
 
 import { isMobile } from './utils';
@@ -50,7 +50,7 @@ export const requestXRDevice = async function (global, config) {
 
   // Check for force use nreal device.
   if (config.forceNreal){
-    console.log('force to use nreal xr devices.');
+    console.log('force to request xr device that using nreal webxr-polyfill.');
     return new NRDevice(global);
   }
 

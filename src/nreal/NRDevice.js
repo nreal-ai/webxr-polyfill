@@ -1,10 +1,10 @@
 
-import XRDevice from "./XRDevice";
+import XRDevice from "../devices/XRDevice";
 import { PRIVATE as XRSESSION_PRIVATE } from '../api/XRSession';
-import GamepadXRInputSource from "./GamepadXRInputSource";
+import GamepadXRInputSource from "../devices/GamepadXRInputSource";
 import { vec3, quat, mat4, } from 'gl-matrix/src/gl-matrix';
 
-import NrealBridge from '../nreal/NrealBridge';
+import NrealBridge from './NrealBridge';
 
 
 /**
@@ -34,10 +34,11 @@ export default class NRDevice extends XRDevice {
 
     constructor(global, config = {}) {
         super(global);
-        // TODO:
         this.sessions = new Map();
         this.modes = ['inline', 'immersive-vr', 'immersive-ar'];
-        this.features = ['viewer', 'local'];
+        // TODO: what's the features standfor.
+        // TODO: determined the support feature by device config. 
+        this.features = ['viewer', 'local','local-floor','bounded-floor','unbounded','dom-overlay'];
 
         // @TODO: Edit this comment
         // For case where baseLayer's canvas isn't in document.body
@@ -76,8 +77,6 @@ export default class NRDevice extends XRDevice {
      * @param {XRWebGLLayer} layer
      */
     onBaseLayerSet(sessionId, layer) {
-
-        // FIXME:?
         const session = this.sessions.get(sessionId);
 
 
@@ -118,7 +117,6 @@ export default class NRDevice extends XRDevice {
      */
     isFeatureSupported(featureDescriptor) {
 
-        // TODO: determined the support feature by device config. 
         if (this.features.includes(featureDescriptor)) {
             return true;
         }
@@ -153,8 +151,6 @@ export default class NRDevice extends XRDevice {
         this.sessions.set(session.id, session);
 
         if (immersive) {
-
-            // TODO: 
             this.immersiveSession = session;
             this.dispatchEvent('@@webxr-polyfill/vr-present-start', session.id);
         }
@@ -166,15 +162,24 @@ export default class NRDevice extends XRDevice {
      * @return {Function}
      */
     requestAnimationFrame(callback) {
+
         let result = this.bridge.requestUpdate();
-        if (result == -1) {
-         return  setTimeout(this.requestAnimationFrame(callback), 1);
-        } else if (result == 0) {
-            return this.global.requestAnimationFrame(callback);
-        } else {
-            callback();
-            return 100;
+
+        if (result != 1) {
+            setTimeout(() => {
+                let result = this.bridge.requestUpdate();
+                if (result == -1) {
+                    setTimeout(this.requestAnimationFrame(callback), 1);
+                } else if (result == 0) {
+                    this.global.requestAnimationFrame(callback);
+                } else {
+                    callback();
+                }
+            }, 1);
+        }else{
+            this.global.requestAnimationFrame(callback);
         }
+        return 100;
     }
 
     /**
@@ -192,9 +197,6 @@ export default class NRDevice extends XRDevice {
         const far = renderState.depthFar;
         const width = canvas.width;
         const height = canvas.height;
-
-
-        // TODO: 
 
         // If session is not an inline session, XRWebGLLayer's composition disabled boolean
         // should be false and then framebuffer should be marked as opaque.
@@ -220,7 +222,6 @@ export default class NRDevice extends XRDevice {
      * @param {number} sessionId
      */
     onFrameEnd(sessionId) {
-        // TODO:
     }
 
     /**
@@ -365,7 +366,6 @@ export default class NRDevice extends XRDevice {
      * @return {Float32Array}
      */
     getBasePoseMatrix() {
-        // TODO:
         return this.bridge.headPose;
     }
 
@@ -427,7 +427,7 @@ export default class NRDevice extends XRDevice {
         // Bound by XRDevice and called on resize, but
         // this will call child class onWindowResize (or, if not defined,
         // call an infinite loop I guess)
-        this.onWindowResize();
+        // this.onWindowResize();
     }
 
 
@@ -517,6 +517,8 @@ export default class NRDevice extends XRDevice {
                 this.gamepadInputSources.push(inputSourceImpl);
             }
         }
+
+
         for (let i = 0; i < this.bridge.gamepads.length; i++) {
             let gamepad = this.bridge.gamepads[i];
 

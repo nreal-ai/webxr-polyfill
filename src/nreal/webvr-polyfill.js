@@ -1,6 +1,6 @@
 import { vec3, mat4, mat3 } from 'gl-matrix/src/gl-matrix';
 
-import NrealBridge from '../nreal/NrealBridge';
+import NrealBridge from './NrealBridge';
 
 function injectWebvrPolyfill() {
 
@@ -229,6 +229,8 @@ function injectWebvrPolyfill() {
 		var vrD = new VRDisplay(NrealLight)
 		navigator.getVRDisplays = function () {
 			return new Promise(function (resolve, reject) {
+
+				console.log('get vrdisplay from Nreal Webvr-polyfill.');
 				resolve([vrD]);
 			});
 		}
