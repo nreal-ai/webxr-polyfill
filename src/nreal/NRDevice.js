@@ -38,7 +38,7 @@ export default class NRDevice extends XRDevice {
         this.modes = ['inline', 'immersive-vr', 'immersive-ar'];
         // TODO: what's the features standfor.
         // TODO: determined the support feature by device config. 
-        this.features = ['viewer', 'local','local-floor','bounded-floor','unbounded','dom-overlay'];
+        this.features = ['viewer', 'local', 'local-floor', 'bounded-floor', 'unbounded', 'dom-overlay'];
 
         // @TODO: Edit this comment
         // For case where baseLayer's canvas isn't in document.body
@@ -162,22 +162,17 @@ export default class NRDevice extends XRDevice {
      * @return {Function}
      */
     requestAnimationFrame(callback) {
-
         let result = this.bridge.requestUpdate();
-
-        if (result != 1) {
+        if (result == -1) {
             setTimeout(() => {
-                let result = this.bridge.requestUpdate();
-                if (result == -1) {
-                    setTimeout(this.requestAnimationFrame(callback), 1);
-                } else if (result == 0) {
-                    this.global.requestAnimationFrame(callback);
-                } else {
-                    callback();
-                }
+                this.requestAnimationFrame(callback);
+                
             }, 1);
-        }else{
-            this.global.requestAnimationFrame(callback);
+        } else if (result == 0) {
+            return this.global.requestAnimationFrame(callback);
+        }
+        else {
+            callback();
         }
         return 100;
     }

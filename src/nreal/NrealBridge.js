@@ -117,9 +117,25 @@ export default class NrealBridge {
                 this.armLength = Math.max(0.1, Math.min(2, this.armLength));
             }
 
-            gamepad.buttons[i].touched = touched;
-            gamepad.buttons[i].pressed = pressed;
-            gamepad.buttons[i].value = pressed ? 1.0 : 0.0;
+
+            // touch area
+            for (let j = 0; j <gamepad.buttons.length;j++){
+                gamepad.buttons[j].touched = false;
+                gamepad.buttons[j].pressed = false;
+                gamepad.buttons[j].value = 0;
+            }
+            if(data[11] < -0.5){
+                if(data[10] < 0){
+                    gamepad.buttons[0].touched = touched;
+                    gamepad.buttons[0].pressed = pressed;
+                    gamepad.buttons[0].value = pressed ? 1.0 : 0.0;
+
+                }else{
+                    gamepad.buttons[1].touched = touched;
+                    gamepad.buttons[1].pressed = pressed;
+                    gamepad.buttons[1].value = pressed ? 1.0 : 0.0;
+                }
+            }
 
             gamepad.pose.position = data.slice(3, 6);
             gamepad.pose.orientation = data.slice(6, 10);
@@ -140,7 +156,7 @@ export default class NrealBridge {
         this.gamepads.length = 0;
         for (let i = 0; i < controllerNum; i++) {
             // FIXME: dual hands support
-            this.gamepads.push(this._createGamepad('NR Controller', 'right', 3, true));
+            this.gamepads.push(this._createGamepad('oculus-touch', 'right', 7, true));
         }
     }
 
@@ -164,7 +180,7 @@ export default class NrealBridge {
             buttons: buttons,
             hand: hand,
             mapping: 'xr-standard',
-            axes: [0, 0],
+            axes: [0, 0,0,0],
             timestamp: startDate + (performance.now() - startPerfNow) 
         };
     };
