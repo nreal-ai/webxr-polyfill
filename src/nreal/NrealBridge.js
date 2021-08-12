@@ -17,10 +17,7 @@ var g_frame_data = "";
 var g_frame_data_state = 0;
 var g_frame_data_count = 0;
 var g_controller_data = "";
-function prepareForNextFrame(frame_data) {
-
-    // console.log('prepareForNextFrame');
-
+function prepareForNextFrameAndCallback(frame_data) {
     var jsonObject = JSON.parse(frame_data);
 
     g_frame_data = jsonObject.headpose;
@@ -28,6 +25,7 @@ function prepareForNextFrame(frame_data) {
 
     g_frame_data_state = 1;
     g_frame_data_count++;
+    return window.nrbridge.requestUpdate()?'Y':'N';    
 }
 
 
@@ -39,11 +37,12 @@ var Eye = {
 var startDate = Date.now();
 var startPerfNow = performance.now();
 
+
+
 export default class NrealBridge {
 
     constructor() {
         this.provider = window.nrprovider != undefined ? window.nrprovider : null;
-        window.prepareForNextFrame = prepareForNextFrame;
 
 
         this.fieldOfView = {
@@ -74,23 +73,106 @@ export default class NrealBridge {
             this.fieldOfView.left, this.near, this.far);
         this._initializeProjectionMatrix(this.rightProjectionMatrix,
             this.fieldOfView.right, this.near, this.far);
+
+
+        this.animationCallback = null;
+
+
+        window.prepareForNextFrameAndCallback = prepareForNextFrameAndCallback;
+
     }
 
     _initializeProjectionMatrix(out, fov, near, far) {
         mat4.frustum(out, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
     }
 
-    requestUpdate() {
-        if (this.provider === undefined) {
-            return 0;
+
+    startSession(){
+        this.provider.StartXR();
+    }
+
+    endSession(){
+        this.provider.ExitXR();
+    }
+    needUpdate(){
+        if (this.provider === undefined && g_frame_data_state === 0) {
+            return false;
+        }else{
+            return true;
+        }
+    }
+
+    // request update with phone controller
+    // requestUpdate() {
+
+    //     if(this.animationCallback === null){
+    //         return false;
+    //     }
+
+    //     this.headPose = mat4.clone(g_frame_data);
+
+    //     // update view matrix
+    //     mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.headPose, this.eyeOffset.left));
+    //     mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.headPose, this.eyeOffset.right));
+
+
+    //     if (this.gamepads.length != g_controller_data.count) {
+    //         this._initializeControllers(g_controller_data.count);
+    //     }
+
+    //     for (let i = 0; i < this.gamepads.length; i++) {
+    //         let gamepad = this.gamepads[i];
+    //         gamepad.timestamp= startDate + (performance.now() - startPerfNow) 
+
+
+    //         let data = g_controller_data.data[i];
+    //         let touched = data[0] === 1;
+    //         let pressed = data[1] === 1;
+
+    //         if (touched && Math.abs(gamepad.axes[1]) > 0.01) {
+    //             let offset = data[11] - gamepad.axes[1];
+    //             this.armLength += offset;
+    //             this.armLength = Math.max(0.1, Math.min(2, this.armLength));
+    //         }
+
+
+    //         // touch area
+    //         for (let j = 0; j <gamepad.buttons.length;j++){
+    //             gamepad.buttons[j].touched = false;
+    //             gamepad.buttons[j].pressed = false;
+    //             gamepad.buttons[j].value = 0;
+    //         }
+    //         if(data[11] < -0.5){
+    //             if(data[10] < 0){
+    //                 gamepad.buttons[0].touched = touched;
+    //                 gamepad.buttons[0].pressed = pressed;
+    //                 gamepad.buttons[0].value = pressed ? 1.0 : 0.0;
+
+    //             }else{
+    //                 gamepad.buttons[1].touched = touched;
+    //                 gamepad.buttons[1].pressed = pressed;
+    //                 gamepad.buttons[1].value = pressed ? 1.0 : 0.0;
+    //             }
+    //         }
+
+    //         gamepad.pose.position = data.slice(3, 6);
+    //         gamepad.pose.orientation = data.slice(6, 10);
+    //         gamepad.axes = [data[10], data[11]]
+    //         let arm = vec3.fromValues(0, 0, -this.armLength);
+    //         vec3.transformQuat(arm, arm, gamepad.pose.orientation);
+    //         vec3.add(gamepad.pose.position, gamepad.pose.position, arm);
+    //     }
+
+    //     this.animationCallback();
+
+    //     return true;
+    // }
+
+    requestUpdate(){
+        if(this.animationCallback === null){
+            return false;
         }
 
-        // console.log('requestUpdate:' + g_frame_data_state);
-        if (g_frame_data_state === 0) {
-            return -1;
-        }
-
-        g_frame_data_state = 0;
         this.headPose = mat4.clone(g_frame_data);
 
         // update view matrix
@@ -111,43 +193,30 @@ export default class NrealBridge {
             let touched = data[0] === 1;
             let pressed = data[1] === 1;
 
-            if (touched && Math.abs(gamepad.axes[1]) > 0.01) {
-                let offset = data[11] - gamepad.axes[1];
-                this.armLength += offset;
-                this.armLength = Math.max(0.1, Math.min(2, this.armLength));
-            }
+            // if (touched && Math.abs(gamepad.axes[1]) > 0.01) {
+            //     let offset = data[11] - gamepad.axes[1];
+            //     this.armLength += offset;
+            //     this.armLength = Math.max(0.1, Math.min(2, this.armLength));
+            // }
 
 
             // touch area
             for (let j = 0; j <gamepad.buttons.length;j++){
-                gamepad.buttons[j].touched = false;
-                gamepad.buttons[j].pressed = false;
-                gamepad.buttons[j].value = 0;
+                gamepad.buttons[j].touched = touched;
+                gamepad.buttons[j].pressed = pressed;
+                gamepad.buttons[j].value = pressed ? 1.0 : 0.0;
             }
-            if(data[11] < -0.5){
-                if(data[10] < 0){
-                    gamepad.buttons[0].touched = touched;
-                    gamepad.buttons[0].pressed = pressed;
-                    gamepad.buttons[0].value = pressed ? 1.0 : 0.0;
-
-                }else{
-                    gamepad.buttons[1].touched = touched;
-                    gamepad.buttons[1].pressed = pressed;
-                    gamepad.buttons[1].value = pressed ? 1.0 : 0.0;
-                }
-            }
+            
 
             gamepad.pose.position = data.slice(3, 6);
             gamepad.pose.orientation = data.slice(6, 10);
             gamepad.axes = [data[10], data[11]]
-            let arm = vec3.fromValues(0, 0, -this.armLength);
-            vec3.transformQuat(arm, arm, gamepad.pose.orientation);
-            vec3.add(gamepad.pose.position, gamepad.pose.position, arm);
-
-
         }
 
-        return 1;
+        this.animationCallback();
+
+        return true;
+
     }
 
 
@@ -265,3 +334,17 @@ export default class NrealBridge {
         return true;
     }
 }
+
+
+var Bridge;
+(
+    function(){
+        var instance;
+        Bridge = function Bridge(){
+            if(instance){
+                return instance;
+            }
+            instance = new NrealBridge();
+        }
+    }()
+);

@@ -58,6 +58,7 @@ export default class NRDevice extends XRDevice {
 
 
         this.bridge = new NrealBridge();
+        window.nrbridge = this.bridge;
         // controllers
         this.gamepadInputSources = [];
         const inputSourceImpl = new GamepadXRInputSource(this, {}, 0, 1);
@@ -155,6 +156,7 @@ export default class NRDevice extends XRDevice {
             this.dispatchEvent('@@webxr-polyfill/vr-present-start', session.id);
         }
 
+        this.bridge.startSession();
         return Promise.resolve(session.id);
     }
 
@@ -162,17 +164,10 @@ export default class NRDevice extends XRDevice {
      * @return {Function}
      */
     requestAnimationFrame(callback) {
-        let result = this.bridge.requestUpdate();
-        if (result == -1) {
-            setTimeout(() => {
-                this.requestAnimationFrame(callback);
-                
-            }, 1);
-        } else if (result == 0) {
+        this.bridge.animationCallback = callback;
+        
+        if(!this.bridge.needUpdate()){
             return this.global.requestAnimationFrame(callback);
-        }
-        else {
-            callback();
         }
         return 100;
     }
@@ -291,6 +286,8 @@ export default class NRDevice extends XRDevice {
             this._notifyLeaveImmersive();
         }
         session.ended = true;
+
+        this.bridge.endSession();
     }
 
     /**
