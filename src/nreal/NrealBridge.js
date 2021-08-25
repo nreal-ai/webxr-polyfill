@@ -4,29 +4,25 @@ import GLOBAL from '../lib/global';
 
 // {
 //     "headpose": float[16],
-
-//         "controller": {
-
-//         "count": int,
-
-//         "data": array[float[12]],
-//     }
-
+//     "controller": [
+//         {
+//             'data': float[3 +4 +2],
+//             'buttons':float[buttonNum]
+//         }
+//     ],
 // }
 
 var g_frame_data = "";
 var g_frame_data_state = 0;
 var g_frame_data_count = 0;
-var g_controller_data = "";
-function prepareForNextFrameAndCallback(frame_data) {
-    var jsonObject = JSON.parse(frame_data);
 
-    g_frame_data = jsonObject.headpose;
-    g_controller_data = jsonObject.controller;
+const EPSILON = 0.0001;
+function prepareForNextFrameAndCallback(frame_data) {
+    g_frame_data= JSON.parse(frame_data);
 
     g_frame_data_state = 1;
     g_frame_data_count++;
-    return window.nrbridge.requestUpdate() ? 'Y' : 'N';
+    return window.nrBridge.requestUpdate() ? 'Y' : 'N';
 }
 
 
@@ -113,40 +109,36 @@ export default class NrealBridge {
         if (this.animationCallback === null) {
             return false;
         }
-        this.headPose = mat4.clone(g_frame_data);
+        this.headPose = mat4.clone(g_frame_data.headpose);
         mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.headPose, this.eyeOffset.left));
         mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.headPose, this.eyeOffset.right));
-        if (this.gamepads.length != g_controller_data.count) {
-            this._initializeControllers(g_controller_data.count);
+
+
+        let controllers = g_frame_data.controllers;
+        if (this.gamepads.length != controllers.length) {
+            this._initializeControllers(controllers);
         }
+
 
         for (let i = 0; i < this.gamepads.length; i++) {
             let gamepad = this.gamepads[i];
             gamepad.timestamp = startDate + (performance.now() - startPerfNow);
-            let data = g_controller_data.data[i];
-            let touched = data[0] === 1;
-            let pressed = data[1] === 1;
-
-            let axes0 = data[10];
-            let axes1 = data[11];
 
 
 
-            if (touched && Math.abs(gamepad.axes[1]) > 0.01) {
-                let offset = axes1 - gamepad.axes[1];
-                this.armLength += offset;
-                this.armLength = Math.max(0.01, Math.min(0.75, this.armLength));
-            }
+            let data = controllers[i].data;
+            let position = data.slice(1, 4);
+            let orientation = data.slice(4, 8);
 
-            for (let j = 0; j < gamepad.buttons.length; j++) {
-                gamepad.buttons[j].touched = false;
-                gamepad.buttons[j].pressed = false;
-                gamepad.buttons[j].value = 0;
-            }
+            let axes0 = data[8];
+            let axes1 = data[9];
 
-            let position = data.slice(3, 6);
-            let orientation = data.slice(6, 10);
 
+
+            let touched = Math.abs(axes0 * axes1)> EPSILON ;
+            let pressed = touched;
+            // FIXME: mutil button values
+            let buttons = controllers[i].buttons;
             if (axes0 > 0.5) {
                 gamepad.buttons[0].touched = touched;
                 gamepad.buttons[0].pressed = pressed;
@@ -157,13 +149,29 @@ export default class NrealBridge {
                 gamepad.buttons[3].touched = touched;
                 gamepad.buttons[3].pressed = pressed;
                 gamepad.buttons[3].value = pressed ? 1.0 : 0.0;
+            }else{
+                for (let j = 0; j < gamepad.buttons.length; j++) {
+                    gamepad.buttons[j].touched = false;
+                    gamepad.buttons[j].pressed = false;
+                    gamepad.buttons[j].value = 0;
+                }
             }
 
+
+
+            // FIXME: only use with phone controller.
+            // adjust arm lenght.
+            if (Math.abs(gamepad.axes[1]) > EPSILON) {
+                let offset = axes1 - gamepad.axes[1];
+                this.armLength += offset;
+                this.armLength = Math.max(0.01, Math.min(0.5, this.armLength));
+            }
             let arm = vec3.fromValues(0, 0, -this.armLength);
             vec3.transformQuat(arm, arm, orientation);
             vec3.add(gamepad.pose.position, position, arm);
 
 
+            // double speed in rotation with touching
             let handOri = quat.clone(orientation);
             if (touched) {
                 if (!this.firstTouch) {
@@ -321,12 +329,12 @@ export default class NrealBridge {
     return out;
   }
 
-
-    _initializeControllers(controllerNum) {
+    _initializeControllers(controllerData) {
         this.gamepads.length = 0;
-        for (let i = 0; i < controllerNum; i++) {
-            // FIXME: dual hands support
-            this.gamepads.push(this._createGamepad('oculus-touch', 'right', 7, true));
+        for (let i = 0; i < controllerData.length; i++) {
+            let raw = controllerData[i];
+            let hand =  raw.data[0] === 0?'left':'right';
+            this.gamepads.push(this._createGamepad('oculus-touch', hand, raw.buttons.length, true));
         }
     }
 
@@ -351,7 +359,13 @@ export default class NrealBridge {
             hand: hand,
             mapping: 'xr-standard',
             axes: [0, 0, 0, 0],
-            timestamp: startDate + (performance.now() - startPerfNow)
+            timestamp: startDate + (performance.now() - startPerfNow),
+            // fake actuator
+            hapticActuators: [
+                {type:'unknown',
+                pulse:function(a,b){},
+                }
+            ],
         };
     };
 
@@ -384,19 +398,17 @@ export default class NrealBridge {
         if (this.provider != null) {
             // float4 array, tangent values of the 
             var val = JSON.parse(this.provider.getEyeFov(eyeIndex));
-            val[0] = -val[0];
-            val[3] = -val[3];
-            // sort to left,right,bottom,top
-            const bottom = val[3];
-            val[3] = val[2];
-            val[2] = bottom;
-
-
             return val;
         }
         return [-1, 1, -1, 1];
     }
 
+
+    onEvent(event){
+        if(this.provider != null){
+            this.provider.onEvent(event);
+        }
+    }
 
     // for webvr dataset
 
@@ -435,17 +447,3 @@ export default class NrealBridge {
         return true;
     }
 }
-
-
-var Bridge;
-(
-    function () {
-        var instance;
-        Bridge = function Bridge() {
-            if (instance) {
-                return instance;
-            }
-            instance = new NrealBridge();
-        }
-    }()
-);

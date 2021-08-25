@@ -21,6 +21,7 @@ import {
 } from './polyfill-globals';
 import { isImageBitmapSupported, isMobile } from './utils';
 import { requestXRDevice } from './devices';
+import NrealBridge from './nreal/NrealBridge';
 
 
 import injectWebvrPolyfill from './nreal/webvr-polyfill';
@@ -63,6 +64,10 @@ export default class WebXRPolyfill {
     this.nativeWebXR = 'xr' in this.global.navigator;
     this.injected = false;
 
+
+    // init global nreal bridge object.
+    window.nrBridge = new NrealBridge();
+
     // If no native WebXR implementation found, inject one
     if (!this.nativeWebXR) {
       this._injectPolyfill(this.global);
@@ -72,7 +77,7 @@ export default class WebXRPolyfill {
 
     if(this.config.webvrCompatible){
 
-      injectWebvrPolyfill();
+      injectWebvrPolyfill(window.nrBridge);
 
       //fake orientation
       Object.defineProperty(window, 'orientation', {

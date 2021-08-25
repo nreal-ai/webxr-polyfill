@@ -339,7 +339,7 @@ export default class XRSession extends EventTarget {
         
       }
       // TODO: Create an XRBoundedReferenceSpace with the correct boundaries.
-      throw new DOMException(`The WebXR polyfill does not support the ${type} reference space yet.`, 'NotSupportedError');
+      // throw new DOMException(`The WebXR polyfill does not support the ${type} reference space yet.`, 'NotSupportedError');
     }
 
     return new XRReferenceSpace(type, transform);

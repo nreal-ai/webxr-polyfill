@@ -57,8 +57,7 @@ export default class NRDevice extends XRDevice {
         };
 
 
-        this.bridge = new NrealBridge();
-        window.nrbridge = this.bridge;
+        this.bridge = window.nrBridge
         // controllers
         this.gamepadInputSources = [];
         const inputSourceImpl = new GamepadXRInputSource(this, {}, 0, 1);
@@ -260,7 +259,14 @@ export default class NRDevice extends XRDevice {
      */
     async requestFrameOfReferenceTransform(type, options) {
         // TODO: imp
-        return undefined;
+        let matrix = mat4.create();
+        if(type === 'local-floor' || type === 'bounded-floor') {
+            mat4.fromTranslation(matrix,vec3.fromValues(0,1.6,0));
+        }else{
+            mat4.fromTranslation(matrix,vec3.fromValues(0,0.0,0));
+        }
+
+        return matrix;
     }
 
     /**
