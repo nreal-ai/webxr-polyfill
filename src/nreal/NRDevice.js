@@ -161,7 +161,7 @@ export default class NRDevice extends XRDevice {
         }
 
 
-        return Promise.resolve(session.id);
+        // return Promise.resolve(session.id);
         // wait for
         let myFirstPromise = new Promise(function (resolve, reject) {
             //当异步代码执行成功时，我们才会调用resolve(...), 当异步代码失败时就会调用reject(...)
