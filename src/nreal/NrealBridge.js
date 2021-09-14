@@ -18,7 +18,7 @@ var g_frame_data_count = 0;
 
 const EPSILON = 0.0001;
 function prepareForNextFrameAndCallback(frame_data) {
-    g_frame_data= JSON.parse(frame_data);
+    g_frame_data = JSON.parse(frame_data);
 
     g_frame_data_state = 1;
     g_frame_data_count++;
@@ -88,13 +88,6 @@ export default class NrealBridge {
     }
 
 
-    startSession() {
-        this.provider.StartXR();
-    }
-
-    endSession() {
-        this.provider.ExitXR();
-    }
     needUpdate() {
         if (this.provider === undefined && g_frame_data_state === 0) {
             return false;
@@ -135,7 +128,7 @@ export default class NrealBridge {
 
 
 
-            let touched = Math.abs(axes0 * axes1)> EPSILON ;
+            let touched = Math.abs(axes0 * axes1) > EPSILON;
             let pressed = touched;
             // FIXME: mutil button values
             let buttons = controllers[i].buttons;
@@ -149,7 +142,7 @@ export default class NrealBridge {
                 gamepad.buttons[3].touched = touched;
                 gamepad.buttons[3].pressed = pressed;
                 gamepad.buttons[3].value = pressed ? 1.0 : 0.0;
-            }else{
+            } else {
                 for (let j = 0; j < gamepad.buttons.length; j++) {
                     gamepad.buttons[j].touched = false;
                     gamepad.buttons[j].pressed = false;
@@ -182,16 +175,16 @@ export default class NrealBridge {
 
                 let curEuler = vec3.create();
                 this._getEuler(curEuler, orientation);
-                
-                let newEuler = vec3.create();
-                newEuler[0] = this.touchStartEuler[0] + (curEuler[0] -  this.touchStartEuler[0])*2;
-                newEuler[1] = this.touchStartEuler[1] + (curEuler[1] -  this.touchStartEuler[1])*2;
-                newEuler[2] = curEuler[2] ;
 
-                
+                let newEuler = vec3.create();
+                newEuler[0] = this.touchStartEuler[0] + (curEuler[0] - this.touchStartEuler[0]) * 2;
+                newEuler[1] = this.touchStartEuler[1] + (curEuler[1] - this.touchStartEuler[1]) * 2;
+                newEuler[2] = curEuler[2];
+
+
                 const order = 'yxz';
-                let  temp = quat.create();
-                this._fromEuler(temp,newEuler[0],newEuler[1],newEuler[2],order);
+                let temp = quat.create();
+                this._fromEuler(temp, newEuler[0], newEuler[1], newEuler[2], order);
                 handOri[0] = temp[3];
                 handOri[1] = temp[2];
                 handOri[2] = temp[0];
@@ -245,7 +238,7 @@ export default class NrealBridge {
         }
         // TODO: Return them as degrees and not as radians
 
-        let toDegree = 180/ Math.PI;
+        let toDegree = 180 / Math.PI;
 
 
         out[0] *= toDegree
@@ -267,73 +260,73 @@ export default class NrealBridge {
      * @function
      */
     _fromEuler(out, x, y, z, order = 'xyz') {
-    let halfToRad = Math.PI / 360;
-    x *= halfToRad;
-    z *= halfToRad;
-    y *= halfToRad;
-  
-    let sx = Math.sin(x);
-    let cx = Math.cos(x);
-    let sy = Math.sin(y);
-    let cy = Math.cos(y);
-    let sz = Math.sin(z);
-    let cz = Math.cos(z);
-  
-    switch (order) {
-      case "xyz":
-        out[0] = sx * cy * cz + cx * sy * sz;
-        out[1] = cx * sy * cz - sx * cy * sz;
-        out[2] = cx * cy * sz + sx * sy * cz;
-        out[3] = cx * cy * cz - sx * sy * sz;
-        break;
-  
-      case "xzy":
-        out[0] = sx * cy * cz - cx * sy * sz;
-        out[1] = cx * sy * cz - sx * cy * sz;
-        out[2] = cx * cy * sz + sx * sy * cz;
-        out[3] = cx * cy * cz + sx * sy * sz;
-        break;
-  
-      case "yxz":
-        out[0] = sx * cy * cz + cx * sy * sz;
-        out[1] = cx * sy * cz - sx * cy * sz;
-        out[2] = cx * cy * sz - sx * sy * cz;
-        out[3] = cx * cy * cz + sx * sy * sz;
-        break;
-  
-      case "yzx":
-        out[0] = sx * cy * cz + cx * sy * sz;
-        out[1] = cx * sy * cz + sx * cy * sz;
-        out[2] = cx * cy * sz - sx * sy * cz;
-        out[3] = cx * cy * cz - sx * sy * sz;
-        break;
-  
-      case "zxy":
-        out[0] = sx * cy * cz - cx * sy * sz;
-        out[1] = cx * sy * cz + sx * cy * sz;
-        out[2] = cx * cy * sz + sx * sy * cz;
-        out[3] = cx * cy * cz - sx * sy * sz;
-        break;
-  
-      case "zyx":
-        out[0] = sx * cy * cz - cx * sy * sz;
-        out[1] = cx * sy * cz + sx * cy * sz;
-        out[2] = cx * cy * sz - sx * sy * cz;
-        out[3] = cx * cy * cz + sx * sy * sz;
-        break;
-  
-      default:
-        throw new Error('Unknown angle order ' + order);
+        let halfToRad = Math.PI / 360;
+        x *= halfToRad;
+        z *= halfToRad;
+        y *= halfToRad;
+
+        let sx = Math.sin(x);
+        let cx = Math.cos(x);
+        let sy = Math.sin(y);
+        let cy = Math.cos(y);
+        let sz = Math.sin(z);
+        let cz = Math.cos(z);
+
+        switch (order) {
+            case "xyz":
+                out[0] = sx * cy * cz + cx * sy * sz;
+                out[1] = cx * sy * cz - sx * cy * sz;
+                out[2] = cx * cy * sz + sx * sy * cz;
+                out[3] = cx * cy * cz - sx * sy * sz;
+                break;
+
+            case "xzy":
+                out[0] = sx * cy * cz - cx * sy * sz;
+                out[1] = cx * sy * cz - sx * cy * sz;
+                out[2] = cx * cy * sz + sx * sy * cz;
+                out[3] = cx * cy * cz + sx * sy * sz;
+                break;
+
+            case "yxz":
+                out[0] = sx * cy * cz + cx * sy * sz;
+                out[1] = cx * sy * cz - sx * cy * sz;
+                out[2] = cx * cy * sz - sx * sy * cz;
+                out[3] = cx * cy * cz + sx * sy * sz;
+                break;
+
+            case "yzx":
+                out[0] = sx * cy * cz + cx * sy * sz;
+                out[1] = cx * sy * cz + sx * cy * sz;
+                out[2] = cx * cy * sz - sx * sy * cz;
+                out[3] = cx * cy * cz - sx * sy * sz;
+                break;
+
+            case "zxy":
+                out[0] = sx * cy * cz - cx * sy * sz;
+                out[1] = cx * sy * cz + sx * cy * sz;
+                out[2] = cx * cy * sz + sx * sy * cz;
+                out[3] = cx * cy * cz - sx * sy * sz;
+                break;
+
+            case "zyx":
+                out[0] = sx * cy * cz - cx * sy * sz;
+                out[1] = cx * sy * cz + sx * cy * sz;
+                out[2] = cx * cy * sz - sx * sy * cz;
+                out[3] = cx * cy * cz + sx * sy * sz;
+                break;
+
+            default:
+                throw new Error('Unknown angle order ' + order);
+        }
+
+        return out;
     }
-  
-    return out;
-  }
 
     _initializeControllers(controllerData) {
         this.gamepads.length = 0;
         for (let i = 0; i < controllerData.length; i++) {
             let raw = controllerData[i];
-            let hand =  raw.data[0] === 0?'left':'right';
+            let hand = raw.data[0] === 0 ? 'left' : 'right';
             this.gamepads.push(this._createGamepad('oculus-touch', hand, raw.buttons.length, true));
         }
     }
@@ -362,8 +355,9 @@ export default class NrealBridge {
             timestamp: startDate + (performance.now() - startPerfNow),
             // fake actuator
             hapticActuators: [
-                {type:'unknown',
-                pulse:function(a,b){},
+                {
+                    type: 'unknown',
+                    pulse: function (a, b) { },
                 }
             ],
         };
@@ -404,8 +398,8 @@ export default class NrealBridge {
     }
 
 
-    onEvent(event){
-        if(this.provider != null){
+    onEvent(event) {
+        if (this.provider != null) {
             this.provider.onEvent(event);
         }
     }
