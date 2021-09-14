@@ -57,8 +57,8 @@ export default class NRDevice extends XRDevice {
         };
 
 
-        this.bridge = new NrealBridge();
-        window.nrbridge = this.bridge;
+        // this.bridge = window.nrBridge;
+        // this.bridge.endSessions = this._endSessions;
         // controllers
         this.gamepadInputSources = [];
         const inputSourceImpl = new GamepadXRInputSource(this, {}, 0, 1);
@@ -67,6 +67,10 @@ export default class NRDevice extends XRDevice {
 
 
         this.debugout = true;
+
+
+        let xr = Symbol.for('@@webxr-polyfill/XR');
+        console.log(xr);
     }
 
 
@@ -156,8 +160,18 @@ export default class NRDevice extends XRDevice {
             this.dispatchEvent('@@webxr-polyfill/vr-present-start', session.id);
         }
 
-        this.bridge.startSession();
-        return Promise.resolve(session.id);
+
+        // return Promise.resolve(session.id);
+        // wait for
+        let myFirstPromise = new Promise(function (resolve, reject) {
+            //当异步代码执行成功时，我们才会调用resolve(...), 当异步代码失败时就会调用reject(...)
+            //在本例中，我们使用setTimeout(...)来模拟异步代码，实际编码时可能是XHR请求或是HTML5的一些API方法.
+            setTimeout(function () {
+                resolve(session.id); //代码正常执行！
+            }, 250);
+        });
+
+        return Promise.resolve(myFirstPromise);
     }
 
     /**
@@ -165,8 +179,8 @@ export default class NRDevice extends XRDevice {
      */
     requestAnimationFrame(callback) {
         this.bridge.animationCallback = callback;
-        
-        if(!this.bridge.needUpdate()){
+
+        if (!this.bridge.needUpdate()) {
             return this.global.requestAnimationFrame(callback);
         }
         return 100;
@@ -260,7 +274,14 @@ export default class NRDevice extends XRDevice {
      */
     async requestFrameOfReferenceTransform(type, options) {
         // TODO: imp
-        return undefined;
+        let matrix = mat4.create();
+        if (type === 'local-floor' || type === 'bounded-floor') {
+            mat4.fromTranslation(matrix, vec3.fromValues(0, 1.6, 0));
+        } else {
+            mat4.fromTranslation(matrix, vec3.fromValues(0, 0.0, 0));
+        }
+
+        return matrix;
     }
 
     /**
@@ -287,7 +308,16 @@ export default class NRDevice extends XRDevice {
         }
         session.ended = true;
 
-        this.bridge.endSession();
+
+        let myFirstPromise = new Promise(function (resolve, reject) {
+            //当异步代码执行成功时，我们才会调用resolve(...), 当异步代码失败时就会调用reject(...)
+            //在本例中，我们使用setTimeout(...)来模拟异步代码，实际编码时可能是XHR请求或是HTML5的一些API方法.
+            setTimeout(function () {
+
+            }, 250);
+        });
+
+
     }
 
     /**
@@ -420,6 +450,7 @@ export default class NRDevice extends XRDevice {
         // this will call child class onWindowResize (or, if not defined,
         // call an infinite loop I guess)
         // this.onWindowResize();
+
     }
 
 
@@ -537,6 +568,13 @@ export default class NRDevice extends XRDevice {
                 }
                 inputSourceImpl.primarySqueezeActionPressed = primarySqueezeActionPressed;
             }
+        }
+    }
+
+    _endSessions() {
+        for (let session of this.sessions) {
+            // session.end()   
+
         }
     }
 }

@@ -21,6 +21,7 @@ import {
 } from './polyfill-globals';
 import { isImageBitmapSupported, isMobile } from './utils';
 import { requestXRDevice } from './devices';
+import NrealBridge from './nreal/NrealBridge';
 
 
 import injectWebvrPolyfill from './nreal/webvr-polyfill';
@@ -48,7 +49,7 @@ const CONFIG_DEFAULTS = {
   // Force to use Nreal device
   forceNreal: true,
 
-  webvrCompatible : true,
+  webvrCompatible: true,
 };
 
 const partials = ['navigator', 'HTMLCanvasElement', 'WebGLRenderingContext'];
@@ -57,11 +58,15 @@ export default class WebXRPolyfill {
   /**
    * @param {object?} config
    */
-  constructor(config={}) {
+  constructor(config = {}) {
     this.config = Object.freeze(Object.assign({}, CONFIG_DEFAULTS, config));
     this.global = this.config.global;
     this.nativeWebXR = 'xr' in this.global.navigator;
     this.injected = false;
+
+
+    // init global nreal bridge object.
+    window.nrBridge = new NrealBridge();
 
     // If no native WebXR implementation found, inject one
     if (!this.nativeWebXR) {
@@ -70,15 +75,15 @@ export default class WebXRPolyfill {
       this._injectCompatibilityShims(this.global);
     }
 
-    if(this.config.webvrCompatible){
+    if (this.config.webvrCompatible) {
 
-      injectWebvrPolyfill();
+      injectWebvrPolyfill(window.nrBridge);
 
       //fake orientation
       Object.defineProperty(window, 'orientation', {
         value: 90,
         configurable: true,
-    });
+      });
     }
   }
 
@@ -115,7 +120,7 @@ export default class WebXRPolyfill {
 
         // If we needed to polyfill WebGLRenderingContext, do the same
         // for WebGL2 contexts if it exists.
-        if (global.WebGL2RenderingContext){
+        if (global.WebGL2RenderingContext) {
           polyfillMakeXRCompatible(global.WebGL2RenderingContext);
         }
 
@@ -159,10 +164,10 @@ host this content on a secure origin for the best user experience.
     // isSessionSupported. Wraps the function to ensure the promise properly
     // resolves with a boolean.
     if (global.navigator.xr &&
-        'supportsSession' in global.navigator.xr &&
-        !('isSessionSupported' in global.navigator.xr)) {
+      'supportsSession' in global.navigator.xr &&
+      !('isSessionSupported' in global.navigator.xr)) {
       let originalSupportsSession = global.navigator.xr.supportsSession;
-      global.navigator.xr.isSessionSupported = function(mode) {
+      global.navigator.xr.isSessionSupported = function (mode) {
         return originalSupportsSession.call(this, mode).then(() => {
           return true;
         }).catch(() => {
@@ -170,10 +175,10 @@ host this content on a secure origin for the best user experience.
         });
       }
 
-      global.navigator.xr.supportsSession = function(mode) {
+      global.navigator.xr.supportsSession = function (mode) {
         console.warn("navigator.xr.supportsSession() is deprecated. Please " +
-        "call navigator.xr.isSessionSupported() instead and check the boolean " +
-        "value returned when the promise resolves.");
+          "call navigator.xr.isSessionSupported() instead and check the boolean " +
+          "value returned when the promise resolves.");
         return originalSupportsSession.call(this, mode);
       }
     }

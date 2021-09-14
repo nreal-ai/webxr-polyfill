@@ -2,7 +2,7 @@ import { vec3, mat4, mat3 } from 'gl-matrix/src/gl-matrix';
 
 import NrealBridge from './NrealBridge';
 
-function injectWebvrPolyfill() {
+function injectWebvrPolyfill(nrbridge) {
 
 	'use strict';
 	var NrealLight = {
@@ -86,7 +86,7 @@ function injectWebvrPolyfill() {
 		event.reason = reason;
 		return event;
 	}
-	function VRDisplay(model) {
+	function VRDisplay(nrBridge,model) {
 		this.provider = window.nrprovider != undefined ? window.nrprovider : null;
 		this.depthFar = 1000;
 		this.depthNear = .1;
@@ -126,7 +126,7 @@ function injectWebvrPolyfill() {
 		this.rightEyeParameters.offset[0] = model.rightEye.offset;
 
 		// read eye parameters 
-		this.bridge = new NrealBridge(); 
+		this.bridge = nrBridge;
 		this.bridge.updateVrEyeParameters(this.leftEyeParameters,Eye.left);
 		this.bridge.updateVrEyeParameters(this.rightEyeParameters,Eye.right)
 
@@ -135,10 +135,10 @@ function injectWebvrPolyfill() {
 
 			if (e.detail.state) {
 				var event = createVRDisplayEvent('vrdisplayactivate', this, 'HMD activated');
-				window.dispatchEvent(event);
+				this.dispatchEvent(event);
 			} else {
 				var event = createVRDisplayEvent('vrdisplaydeactivate', this, 'HMD deactivated');
-				window.dispatchEvent(event);
+				this.dispatchEvent(event);
 			}
 		}.bind(this));
 
@@ -189,7 +189,7 @@ function injectWebvrPolyfill() {
 				this.layers.push(layer);
 			}.bind(this));
 			var event = createVRDisplayEvent('vrdisplaypresentchange', this, 'Presenting requested');
-			window.dispatchEvent(event);
+			this.dispatchEvent(event);
 			resolve();
 		}.bind(this));
 	}
@@ -199,7 +199,7 @@ function injectWebvrPolyfill() {
 			this.isPresenting = false;
 			this.layers = [];
 			var event = createVRDisplayEvent('vrdisplaypresentchange', this, 'Presenting exited');
-			window.dispatchEvent(event);
+			this.dispatchEvent(event);
 			resolve();
 		}.bind(this));
 	}
@@ -209,8 +209,12 @@ function injectWebvrPolyfill() {
 
 	VRDisplay.prototype.resetPose = function () {
 		var event = new Event('webvr-resetpose');
-		window.dispatchEvent(event);
+		this.dispatchEvent(event);
+	}
 
+	VRDisplay.prototype.dispatchEvent = function(event){
+
+		window.dispatchEvent(event);
 	}
 
 	VRDisplay.prototype.getLayers = function () {
@@ -226,7 +230,8 @@ function injectWebvrPolyfill() {
 	assignToWindow();
 
 	(function () {
-		var vrD = new VRDisplay(NrealLight)
+		
+		var vrD = new VRDisplay(nrbridge,NrealLight)
 		navigator.getVRDisplays = function () {
 			return new Promise(function (resolve, reject) {
 
@@ -237,6 +242,7 @@ function injectWebvrPolyfill() {
 	})();
 	var event = new Event('webvr-ready');
 	window.dispatchEvent(event);
+
 }
 
 

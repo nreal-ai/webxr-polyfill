@@ -76,5 +76,8 @@ export default class EventTarget {
     if (typeof this[`on${type}`] === 'function') {
       this[`on${type}`](event);
     }
+
+    // callback
+    window.nrBridge.onEvent(type);
   }
 }
