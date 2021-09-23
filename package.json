@@ -48,6 +48,7 @@
     "build": "npm run build-script && npm run build-min && npm run build-module && npm run copy",
     "copy": "cp -r ./build ../webxr-samples/js/third-party/webxr-polyfill",
     "build-nr": "npm run build-module && npm run copy",
+    "build-local":"npm run build-script && npm run copy",
 
 
     "build-vrtest": "npm run build-script && npm run copy-vrtest",

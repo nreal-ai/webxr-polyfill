@@ -57,7 +57,7 @@ export default class NRDevice extends XRDevice {
         };
 
 
-        // this.bridge = window.nrBridge;
+        this.bridge = window.nrBridge;
         // this.bridge.endSessions = this._endSessions;
         // controllers
         this.gamepadInputSources = [];
@@ -67,10 +67,6 @@ export default class NRDevice extends XRDevice {
 
 
         this.debugout = true;
-
-
-        let xr = Symbol.for('@@webxr-polyfill/XR');
-        console.log(xr);
     }
 
 
@@ -93,18 +89,18 @@ export default class NRDevice extends XRDevice {
         session.baseLayer = layer;
         if (session.immersive && session.baseLayer) {
             this._appendBaseLayerCanvasToDiv(sessionId);
-            if (session.ar) {
-                const canvas = session.baseLayer.context.canvas;
-                canvas.width = this.resolution.width;
-                canvas.height = this.resolution.height;
-                this.arScene.setCanvas(canvas);
-                if (canvas.parentElement) {
-                    // Not sure why but this is necessary for Firefox.
-                    // Otherwise, the canvas won't be rendered in AR scene.
-                    // @TODO: Figure out the root issue and resolve.
-                    canvas.parentElement.removeChild(canvas);
-                }
-            }
+            // if (session.ar) {
+            //     const canvas = session.baseLayer.context.canvas;
+            //     canvas.width = this.resolution.width;
+            //     canvas.height = this.resolution.height;
+            //     this.arScene.setCanvas(canvas);
+            //     if (canvas.parentElement) {
+            //         // Not sure why but this is necessary for Firefox.
+            //         // Otherwise, the canvas won't be rendered in AR scene.
+            //         // @TODO: Figure out the root issue and resolve.
+            //         canvas.parentElement.removeChild(canvas);
+            //     }
+            // }
         }
     }
 
@@ -148,9 +144,11 @@ export default class NRDevice extends XRDevice {
      * @return {Promise<number>}
      */
     async requestSession(mode, enabledFeatures) {
+        console.log('request session from NRDevice ' + mode);
         if (!this.isSessionSupported(mode)) {
             return Promise.reject();
         }
+
         let immersive = mode === 'immersive-vr' || mode === 'immersive-ar';
         const session = new Session(mode, enabledFeatures);
         this.sessions.set(session.id, session);
@@ -178,6 +176,8 @@ export default class NRDevice extends XRDevice {
      * @return {Function}
      */
     requestAnimationFrame(callback) {
+
+        console.log('XR requestAnimationFrame');
         this.bridge.animationCallback = callback;
 
         if (!this.bridge.needUpdate()) {
@@ -226,6 +226,12 @@ export default class NRDevice extends XRDevice {
      * @param {number} sessionId
      */
     onFrameEnd(sessionId) {
+
+        const session = this.sessions.get(sessionId);
+        if (session.ended || !session.baseLayer) {
+            return;
+        }
+        this.bridge.onFrameEnd(session);
     }
 
     /**
