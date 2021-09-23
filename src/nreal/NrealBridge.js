@@ -12,7 +12,7 @@ import GLOBAL from '../lib/global';
 //     ],
 // }
 
-var g_frame_data = "";
+var g_frame_data = {};
 var g_frame_data_state = 0;
 var g_frame_data_count = 0;
 
@@ -58,7 +58,7 @@ export default class NrealBridge {
 
 
         this.near = 0.01;
-        this.far = 1000;
+        this.far = 10000;
 
         this.leftViewMatrix = mat4.create();
         this.rightViewMatrix = mat4.create();
@@ -80,6 +80,11 @@ export default class NrealBridge {
         this.touchStartEuler = vec3.create();
         this.touchstartQuat = quat.create();
         this.firstTouch = false;
+
+
+        this.countFrame = 0;
+        this.vertex_buffer = 0;
+        this.shaderProgram = 0;
 
     }
 
@@ -439,5 +444,58 @@ export default class NrealBridge {
         frameData.pose = this.headPose;
 
         return true;
+    }
+
+    initializeEndFrame(gl) {
+        const canvas = gl.canvas;
+        var pointx = ((0 + 0.5) / canvas.width * 2.0 - 1.0);
+        var pointy = ((canvas.height - 0.5) / canvas.height * 2.0 - 1.0);
+        this.vertex_buffer = gl.createBuffer();
+        var vertCode =
+            'void main(void) {' +
+            ' gl_Position = vec4(' + pointx + ',' + pointy + ',0.0, 1.0);' +
+            ' gl_PointSize = 5.0;' +
+            '}';
+        var vertShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertShader, vertCode);
+        gl.compileShader(vertShader);
+        var fragCode =
+            'precision mediump float;' +
+            'uniform vec4 v_color;' +
+            'void main(void) {' +
+            ' gl_FragColor = v_color;' +
+            '}';
+        var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragShader, fragCode);
+        gl.compileShader(fragShader);
+        this.shaderProgram = gl.createProgram();
+        gl.attachShader(this.shaderProgram, vertShader);
+        gl.attachShader(this.shaderProgram, fragShader);
+        gl.linkProgram(this.shaderProgram);
+    }
+    onFrameEnd(session) {
+        this.countFrame = g_frame_data.posetime;
+        console.log("onFrameEnd " + this.countFrame);
+        const gl = session.baseLayer.context;
+        if (this.vertex_buffer == 0) {
+            this.initializeEndFrame(gl);
+        }
+        const canvas = gl.canvas;
+        var b = this.countFrame & 0xFF;
+        var g = this.countFrame >> 8 & 0xFF;
+        var r = this.countFrame >> 16 & 0xFF;
+        var a = this.countFrame >> 24 & 0xFF;
+        gl.useProgram(this.shaderProgram);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
+        var u_color = gl.getUniformLocation(this.shaderProgram, "v_color");
+
+        gl.disable(gl.BLEND);
+        gl.disable(gl.DEPTH_TEST);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform4f(u_color, b / 255.0, g / 255.0, r / 255.0, 1.0);
+        gl.drawArrays(gl.POINTS, 0, 1);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, 0);
+        gl.useProgram(0);
     }
 }
