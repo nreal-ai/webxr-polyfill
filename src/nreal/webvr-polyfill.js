@@ -86,7 +86,7 @@ function injectWebvrPolyfill(nrbridge) {
 		event.reason = reason;
 		return event;
 	}
-	function VRDisplay(nrBridge,model) {
+	function VRDisplay(nrBridge, model) {
 		this.provider = window.nrprovider != undefined ? window.nrprovider : null;
 		this.depthFar = 1000;
 		this.depthNear = .1;
@@ -127,8 +127,8 @@ function injectWebvrPolyfill(nrbridge) {
 
 		// read eye parameters 
 		this.bridge = nrBridge;
-		this.bridge.updateVrEyeParameters(this.leftEyeParameters,Eye.left);
-		this.bridge.updateVrEyeParameters(this.rightEyeParameters,Eye.right)
+		this.bridge.updateVrEyeParameters(this.leftEyeParameters, Eye.left);
+		this.bridge.updateVrEyeParameters(this.rightEyeParameters, Eye.right)
 
 		// TODO: fire these events while device status changees
 		window.addEventListener('webvr-hmd-activate', function (e) {
@@ -146,16 +146,15 @@ function injectWebvrPolyfill(nrbridge) {
 
 	VRDisplay.prototype.requestAnimationFrame = function (c) {
 
-		let result  = this.bridge.requestUpdate();
+		console.log('WebVR requestAnimationFrame.');
+		// this.bridge.animationCallback = c;
 
-        if (result == -1) {
-            setTimeout(this.requestAnimationFrame(c), 1);
-        } else if (result == 0) {
-            return requestAnimationFrame(c);
-        } else {
-            c();
-            return 100;
-        }
+		// if (!this.bridge.needUpdate()) {
+		// 	return requestAnimationFrame(c);
+		// }
+		// return 100;
+
+		return requestAnimationFrame(c);
 	}
 
 	VRDisplay.prototype.cancelAnimationFrame = function (handle) {
@@ -189,7 +188,9 @@ function injectWebvrPolyfill(nrbridge) {
 				this.layers.push(layer);
 			}.bind(this));
 			var event = createVRDisplayEvent('vrdisplaypresentchange', this, 'Presenting requested');
+
 			this.dispatchEvent(event);
+			console.log('WebVR requestPresent.');
 			resolve();
 		}.bind(this));
 	}
@@ -212,9 +213,9 @@ function injectWebvrPolyfill(nrbridge) {
 		this.dispatchEvent(event);
 	}
 
-	VRDisplay.prototype.dispatchEvent = function(event){
-
+	VRDisplay.prototype.dispatchEvent = function (event) {
 		window.dispatchEvent(event);
+		this.bridge.onEvent(event.type + '/' + event.reason);
 	}
 
 	VRDisplay.prototype.getLayers = function () {
@@ -230,8 +231,8 @@ function injectWebvrPolyfill(nrbridge) {
 	assignToWindow();
 
 	(function () {
-		
-		var vrD = new VRDisplay(nrbridge,NrealLight)
+
+		var vrD = new VRDisplay(nrbridge, NrealLight)
 		navigator.getVRDisplays = function () {
 			return new Promise(function (resolve, reject) {
 
