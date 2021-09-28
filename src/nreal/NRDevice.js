@@ -4,7 +4,6 @@ import { PRIVATE as XRSESSION_PRIVATE } from '../api/XRSession';
 import GamepadXRInputSource from "../devices/GamepadXRInputSource";
 import { vec3, quat, mat4, } from 'gl-matrix/src/gl-matrix';
 
-import NrealBridge from './NrealBridge';
 
 
 /**
@@ -44,7 +43,7 @@ export default class NRDevice extends XRDevice {
         // For case where baseLayer's canvas isn't in document.body
 
         this.div = document.createElement('div');
-        this.div.style.position = 'absolute';
+        this.div.style.position = 'fixed';
         this.div.style.width = '100%';
         this.div.style.height = '100%';
         this.div.style.top = '0';
@@ -176,14 +175,7 @@ export default class NRDevice extends XRDevice {
      * @return {Function}
      */
     requestAnimationFrame(callback) {
-
-        console.log('XR requestAnimationFrame');
-        this.bridge.animationCallback = callback;
-
-        if (!this.bridge.needUpdate()) {
-            return this.global.requestAnimationFrame(callback);
-        }
-        return 100;
+        return this.bridge.requestAnimationFrame(callback);
     }
 
     /**
@@ -279,10 +271,13 @@ export default class NRDevice extends XRDevice {
      * @return {Promise<XRFrameOfReference>}
      */
     async requestFrameOfReferenceTransform(type, options) {
-        // TODO: imp
         let matrix = mat4.create();
         if (type === 'local-floor' || type === 'bounded-floor') {
-            mat4.fromTranslation(matrix, vec3.fromValues(0, 1.6, 0));
+
+            let translation = this.bridge.localTranslation();
+
+            translation = vec3.fromValues(-translation[0], 1.6, -translation[2]);
+            mat4.fromTranslation(matrix, translation);
         } else {
             mat4.fromTranslation(matrix, vec3.fromValues(0, 0.0, 0));
         }
@@ -294,7 +289,7 @@ export default class NRDevice extends XRDevice {
      * @param {number} handle
      */
     cancelAnimationFrame(handle) {
-        this.global.cancelAnimationFrame(handle);
+        return this.bridge.cancelAnimationFrame(handle);
     }
 
     /**

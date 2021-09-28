@@ -1,5 +1,6 @@
 import { vec3, mat4, quat } from "gl-matrix/src/gl-matrix";
 
+import NRXRAnimationTimer from "./NRXRAnimationTimer";
 import GLOBAL from '../lib/global';
 
 // {
@@ -12,18 +13,7 @@ import GLOBAL from '../lib/global';
 //     ],
 // }
 
-var g_frame_data = {};
-var g_frame_data_state = 0;
-var g_frame_data_count = 0;
-
 const EPSILON = 0.0001;
-function prepareForNextFrameAndCallback(frame_data) {
-    g_frame_data = JSON.parse(frame_data);
-
-    g_frame_data_state = 1;
-    g_frame_data_count++;
-    return window.nrBridge.requestUpdate() ? 'Y' : 'N';
-}
 
 
 var Eye = {
@@ -73,10 +63,6 @@ export default class NrealBridge {
 
 
         this.animationCallback = null;
-
-
-        window.prepareForNextFrameAndCallback = prepareForNextFrameAndCallback;
-
         this.touchStartEuler = vec3.create();
         this.touchstartQuat = quat.create();
         this.firstTouch = false;
@@ -86,33 +72,34 @@ export default class NrealBridge {
         this.vertex_buffer = 0;
         this.shaderProgram = 0;
 
+
+        this.animationTImer = new NRXRAnimationTimer();
+        this.frameRawData = {};
     }
 
     _initializeProjectionMatrix(out, fov, near, far) {
         mat4.frustum(out, fov[0] * near, fov[1] * near, fov[2] * near, fov[3] * near, near, far);
     }
 
+    requestAnimationFrame(callback) {
 
-    needUpdate() {
-        if (this.provider === undefined && g_frame_data_state === 0) {
-            return false;
-        } else {
-            return true;
-        }
+        return this.animationTImer.requestAnimationFrame(callback, () => { this.requestUpdate(); });
+
+    }
+
+    cancelAnimationFrame(handle) {
+        return this.animationTImer.cancelAnimationFrame(handle);
     }
 
 
-
     requestUpdate() {
-        if (this.animationCallback === null) {
-            return false;
-        }
-        this.headPose = mat4.clone(g_frame_data.headpose);
+        this.frameRawData = JSON.parse(window.nrprovider.getFrameData());
+        this.headPose = mat4.clone(this.frameRawData.headpose);
         mat4.invert(this.leftViewMatrix, mat4.multiply(this.leftViewMatrix, this.headPose, this.eyeOffset.left));
         mat4.invert(this.rightViewMatrix, mat4.multiply(this.rightViewMatrix, this.headPose, this.eyeOffset.right));
 
 
-        let controllers = g_frame_data.controllers;
+        let controllers = this.frameRawData.controllers;
         if (this.gamepads.length != controllers.length) {
             this._initializeControllers(controllers);
         }
@@ -133,11 +120,14 @@ export default class NrealBridge {
 
 
 
+
             let touched = Math.abs(axes0 * axes1) > EPSILON;
             let pressed = touched;
             // FIXME: mutil button values
             let buttons = controllers[i].buttons;
-            if (axes0 > 0.5) {
+
+
+            if (touched) {
                 gamepad.buttons[0].touched = touched;
                 gamepad.buttons[0].pressed = pressed;
                 gamepad.buttons[0].value = pressed ? 1.0 : 0.0;
@@ -168,43 +158,45 @@ export default class NrealBridge {
             vec3.transformQuat(arm, arm, orientation);
             vec3.add(gamepad.pose.position, position, arm);
 
-
             // double speed in rotation with touching
             let handOri = quat.clone(orientation);
             if (touched) {
-                if (!this.firstTouch) {
-                    this.firstTouch = true;
-                    this.touchstartQuat = quat.clone(orientation);
-                    this._getEuler(this.touchStartEuler, orientation);
-                }
+                // if (!this.firstTouch) {
+                //     this.firstTouch = true;
+                //     this.touchstartQuat = quat.clone(orientation);
+                //     this._getEuler(this.touchStartEuler, orientation);
+                // }
 
-                let curEuler = vec3.create();
-                this._getEuler(curEuler, orientation);
+                // let curEuler = vec3.create();
+                // this._getEuler(curEuler, orientation);
 
-                let newEuler = vec3.create();
-                newEuler[0] = this.touchStartEuler[0] + (curEuler[0] - this.touchStartEuler[0]) * 2;
-                newEuler[1] = this.touchStartEuler[1] + (curEuler[1] - this.touchStartEuler[1]) * 2;
-                newEuler[2] = curEuler[2];
+                // let newEuler = vec3.create();
+                // newEuler[0] = this.touchStartEuler[0] + (curEuler[0] - this.touchStartEuler[0]) * 2;
+                // newEuler[1] = this.touchStartEuler[1] + (curEuler[1] - this.touchStartEuler[1]) * 2;
+                // newEuler[2] = curEuler[2];
 
 
-                const order = 'yxz';
-                let temp = quat.create();
-                this._fromEuler(temp, newEuler[0], newEuler[1], newEuler[2], order);
-                handOri[0] = temp[3];
-                handOri[1] = temp[2];
-                handOri[2] = temp[0];
-                handOri[3] = temp[1];
+                // const order = 'yxz';
+                // let temp = quat.create();
+                // this._fromEuler(temp, newEuler[0], newEuler[1], newEuler[2], order);
+                // handOri[0] = temp[3];
+                // handOri[1] = temp[2];
+                // handOri[2] = temp[0];
+                // handOri[3] = temp[1];
 
 
             } else {
                 this.firstTouch = false;
             }
 
-
+            let rotateController = controllers[i].RotateController
+            if (rotateController) {
+                quat.rotateX(handOri, handOri, Math.PI / 3);
+            }
             gamepad.pose.orientation = handOri;
+
             gamepad.axes = [axes0, axes1];
         }
-        this.animationCallback();
         return true;
     }
 
@@ -441,7 +433,6 @@ export default class NrealBridge {
         frameData.leftViewMatrix = this.leftViewMatrix;
         frameData.rightProjectionMatrix = this.rightProjectionMatrix;
         frameData.rightViewMatrix = this.rightViewMatrix;
-        frameData.pose = this.headPose;
 
         return true;
     }
@@ -474,8 +465,7 @@ export default class NrealBridge {
         gl.linkProgram(this.shaderProgram);
     }
     onFrameEnd(session) {
-        this.countFrame = g_frame_data.posetime;
-        console.log("onFrameEnd " + this.countFrame);
+        this.countFrame = this.frameRawData.posetime;
         const gl = session.baseLayer.context;
         if (this.vertex_buffer == 0) {
             this.initializeEndFrame(gl);
@@ -495,7 +485,15 @@ export default class NrealBridge {
         gl.uniform4f(u_color, b / 255.0, g / 255.0, r / 255.0, 1.0);
         gl.drawArrays(gl.POINTS, 0, 1);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, 0);
-        gl.useProgram(0);
+        // gl.bindBuffer(gl.ARRAY_BUFFER, 0);
+        // gl.useProgram(0);
+    }
+
+
+    localTranslation() {
+        let pose = vec3.create();
+        let frameRawData = JSON.parse(window.nrprovider.getFrameData());
+        mat4.getTranslation(pose, frameRawData.headpose);
+        return pose;
     }
 }

@@ -145,20 +145,11 @@ function injectWebvrPolyfill(nrbridge) {
 	}
 
 	VRDisplay.prototype.requestAnimationFrame = function (c) {
-
-		console.log('WebVR requestAnimationFrame.');
-		// this.bridge.animationCallback = c;
-
-		// if (!this.bridge.needUpdate()) {
-		// 	return requestAnimationFrame(c);
-		// }
-		// return 100;
-
-		return requestAnimationFrame(c);
+		return this.bridge.requestAnimationFrame(callback);
 	}
 
 	VRDisplay.prototype.cancelAnimationFrame = function (handle) {
-		cancelAnimationFrame(handle);
+		return this.bridge.cancelAnimationFrame(handle);
 	}
 
 	VRDisplay.prototype.getEyeParameters = function (id) {
@@ -173,7 +164,9 @@ function injectWebvrPolyfill(nrbridge) {
 	}
 
 	VRDisplay.prototype.getFrameData = function (frameData) {
-		return this.bridge.updateVrFrameData(frameData);
+		this.bridge.updateVrFrameData(frameData);
+		frameData.pose = this.getPose();
+		return true;
 	}
 
 	VRDisplay.prototype.requestPresent = function (layers) {
