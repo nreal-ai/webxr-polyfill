@@ -30,8 +30,6 @@ export default class NrealBridge {
 
     constructor() {
         this.provider = window.nrprovider != undefined ? window.nrprovider : null;
-
-
         this.fieldOfView = {
             left: this._getEyeFov(Eye.LEFT),
             right: this._getEyeFov(Eye.RIGHT)
@@ -201,124 +199,6 @@ export default class NrealBridge {
     }
 
 
-    /**
-     * Returns an euler angle representation of a quaternion
-     * @param  {vec3} out Euler angles, pitch-yaw-roll
-     * @param  {quat} mat Quaternion
-     * @return {vec3} out
-     */
-    _getEuler(out, quat) {
-        let x = quat[0],
-            y = quat[1],
-            z = quat[2],
-            w = quat[3],
-            x2 = x * x,
-            y2 = y * y,
-            z2 = z * z,
-            w2 = w * w;
-        let unit = x2 + y2 + z2 + w2;
-        let test = x * w - y * z;
-        if (test > 0.499995 * unit) { //TODO: Use glmatrix.EPSILON
-            // singularity at the north pole
-            out[0] = Math.PI / 2;
-            out[1] = 2 * Math.atan2(y, x);
-            out[2] = 0;
-        } else if (test < -0.499995 * unit) { //TODO: Use glmatrix.EPSILON
-            // singularity at the south pole
-            out[0] = -Math.PI / 2;
-            out[1] = 2 * Math.atan2(y, x);
-            out[2] = 0;
-        } else {
-            out[0] = Math.asin(2 * (x * z - w * y));
-            out[1] = Math.atan2(2 * (x * w + y * z), 1 - 2 * (z2 + w2));
-            out[2] = Math.atan2(2 * (x * y + z * w), 1 - 2 * (y2 + z2));
-        }
-        // TODO: Return them as degrees and not as radians
-
-        let toDegree = 180 / Math.PI;
-
-
-        out[0] *= toDegree
-        out[1] *= toDegree
-        out[2] *= toDegree
-        return out;
-    }
-
-
-    /**
-     * Creates a quaternion from the given euler angle x, y, z using the provided intrinsic order for the conversion.
-     *
-     * @param {quat} out the receiving quaternion
-     * @param {x} x Angle to rotate around X axis in degrees.
-     * @param {y} y Angle to rotate around Y axis in degrees.
-     * @param {z} z Angle to rotate around Z axis in degrees.
-     * @param {'zyx'|'xyz'|'yxz'|'yzx'|'zxy'|'zyx'} order Intrinsic order for conversion, default is zyx.
-     * @returns {quat} out
-     * @function
-     */
-    _fromEuler(out, x, y, z, order = 'xyz') {
-        let halfToRad = Math.PI / 360;
-        x *= halfToRad;
-        z *= halfToRad;
-        y *= halfToRad;
-
-        let sx = Math.sin(x);
-        let cx = Math.cos(x);
-        let sy = Math.sin(y);
-        let cy = Math.cos(y);
-        let sz = Math.sin(z);
-        let cz = Math.cos(z);
-
-        switch (order) {
-            case "xyz":
-                out[0] = sx * cy * cz + cx * sy * sz;
-                out[1] = cx * sy * cz - sx * cy * sz;
-                out[2] = cx * cy * sz + sx * sy * cz;
-                out[3] = cx * cy * cz - sx * sy * sz;
-                break;
-
-            case "xzy":
-                out[0] = sx * cy * cz - cx * sy * sz;
-                out[1] = cx * sy * cz - sx * cy * sz;
-                out[2] = cx * cy * sz + sx * sy * cz;
-                out[3] = cx * cy * cz + sx * sy * sz;
-                break;
-
-            case "yxz":
-                out[0] = sx * cy * cz + cx * sy * sz;
-                out[1] = cx * sy * cz - sx * cy * sz;
-                out[2] = cx * cy * sz - sx * sy * cz;
-                out[3] = cx * cy * cz + sx * sy * sz;
-                break;
-
-            case "yzx":
-                out[0] = sx * cy * cz + cx * sy * sz;
-                out[1] = cx * sy * cz + sx * cy * sz;
-                out[2] = cx * cy * sz - sx * sy * cz;
-                out[3] = cx * cy * cz - sx * sy * sz;
-                break;
-
-            case "zxy":
-                out[0] = sx * cy * cz - cx * sy * sz;
-                out[1] = cx * sy * cz + sx * cy * sz;
-                out[2] = cx * cy * sz + sx * sy * cz;
-                out[3] = cx * cy * cz - sx * sy * sz;
-                break;
-
-            case "zyx":
-                out[0] = sx * cy * cz - cx * sy * sz;
-                out[1] = cx * sy * cz + sx * cy * sz;
-                out[2] = cx * cy * sz - sx * sy * cz;
-                out[3] = cx * cy * cz + sx * sy * sz;
-                break;
-
-            default:
-                throw new Error('Unknown angle order ' + order);
-        }
-
-        return out;
-    }
-
     _initializeControllers(controllerData) {
         this.gamepads.length = 0;
         for (let i = 0; i < controllerData.length; i++) {
@@ -376,7 +256,7 @@ export default class NrealBridge {
             const data = JSON.parse(this.provider.getEyePoseFromHead(eyeIndex));
             return mat4.clone(data);
         }
-        return mat4.identity(mat4.create());
+        return mat4.create();
     }
 
     _getEyeFov(eye) {
@@ -476,24 +356,27 @@ export default class NrealBridge {
         var r = this.countFrame >> 16 & 0xFF;
         var a = this.countFrame >> 24 & 0xFF;
         gl.useProgram(this.shaderProgram);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
+        var u_color = gl.getUniformLocation(this.shaderProgram, "v_color");
+        var blend_enable = gl.getParameter(gl.BLEND);
+        var depth_test_enable = gl.getParameter(gl.DEPTH_TEST);
+        if (blend_enable)
+            gl.disable(gl.BLEND);
+        if (depth_test_enable)
+            gl.disable(gl.DEPTH_TEST);
+        // gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
         var u_color = gl.getUniformLocation(this.shaderProgram, "v_color");
 
-        gl.disable(gl.BLEND);
-        gl.disable(gl.DEPTH_TEST);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.uniform4f(u_color, b / 255.0, g / 255.0, r / 255.0, 1.0);
         gl.drawArrays(gl.POINTS, 0, 1);
 
-        // gl.bindBuffer(gl.ARRAY_BUFFER, 0);
-        // gl.useProgram(0);
+        if (blend_enable)
+            gl.enable(gl.BLEND);
+        if (depth_test_enable)
+            gl.enable(gl.DEPTH_TEST);
     }
 
-
-    localTranslation() {
-        let pose = vec3.create();
-        let frameRawData = JSON.parse(window.nrprovider.getFrameData());
-        mat4.getTranslation(pose, frameRawData.headpose);
-        return pose;
+    localTransform() {
+        return JSON.parse(window.nrprovider.getFrameData()).headpose;
     }
 }

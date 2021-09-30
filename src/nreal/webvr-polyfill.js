@@ -145,7 +145,7 @@ function injectWebvrPolyfill(nrbridge) {
 	}
 
 	VRDisplay.prototype.requestAnimationFrame = function (c) {
-		return this.bridge.requestAnimationFrame(callback);
+		return this.bridge.requestAnimationFrame(c);
 	}
 
 	VRDisplay.prototype.cancelAnimationFrame = function (handle) {
@@ -170,6 +170,8 @@ function injectWebvrPolyfill(nrbridge) {
 	}
 
 	VRDisplay.prototype.requestPresent = function (layers) {
+
+
 		return new Promise(function (resolve, reject) {
 			this.isPresenting = true;
 			this.layers = [];
@@ -180,11 +182,9 @@ function injectWebvrPolyfill(nrbridge) {
 				if (l.rightBounds) layer.rightBounds = l.rightBounds;
 				this.layers.push(layer);
 			}.bind(this));
-			var event = createVRDisplayEvent('vrdisplaypresentchange', this, 'Presenting requested');
 
+			var event = createVRDisplayEvent('vrdisplaypresentchange', this, 'Presenting requested');
 			this.dispatchEvent(event);
-			console.log('WebVR requestPresent.');
-			resolve();
 		}.bind(this));
 	}
 

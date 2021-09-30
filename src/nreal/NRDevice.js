@@ -274,10 +274,26 @@ export default class NRDevice extends XRDevice {
         let matrix = mat4.create();
         if (type === 'local-floor' || type === 'bounded-floor') {
 
-            let translation = this.bridge.localTranslation();
+            let transform = this.bridge.localTransform();
 
-            translation = vec3.fromValues(-translation[0], 1.6, -translation[2]);
-            mat4.fromTranslation(matrix, translation);
+            let rotation = quat.create();
+            mat4.getRotation(rotation, transform);
+
+            let yawRad = -Math.atan2(transform[2], transform[10]);
+            quat.fromEuler(rotation, 0, yawRad * 180 / Math.PI, 0);
+
+            let translation = vec3.create();
+            mat4.getTranslation(translation, transform);
+            mat4.fromRotationTranslation(matrix, rotation, translation);
+
+
+            let offset = mat4.create();
+            mat4.fromTranslation(offset, vec3.fromValues(0, -1.6, 0));
+
+            mat4.multiply(matrix, matrix, offset);
+            mat4.invert(matrix, matrix);
+
+            console.log('requestFrameOfReferenceTransform=' + matrix);
         } else {
             mat4.fromTranslation(matrix, vec3.fromValues(0, 0.0, 0));
         }
@@ -577,6 +593,123 @@ export default class NRDevice extends XRDevice {
             // session.end()   
 
         }
+    }
+
+    /**
+     * Returns an euler angle representation of a quaternion
+     * @param  {vec3} out Euler angles, pitch-yaw-roll
+     * @param  {quat} mat Quaternion
+     * @return {vec3} out
+     */
+    _getEuler(out, quat) {
+        let x = quat[0],
+            y = quat[1],
+            z = quat[2],
+            w = quat[3],
+            x2 = x * x,
+            y2 = y * y,
+            z2 = z * z,
+            w2 = w * w;
+        let unit = x2 + y2 + z2 + w2;
+        let test = x * w - y * z;
+        if (test > 0.499995 * unit) { //TODO: Use glmatrix.EPSILON
+            // singularity at the north pole
+            out[0] = Math.PI / 2;
+            out[1] = 2 * Math.atan2(y, x);
+            out[2] = 0;
+        } else if (test < -0.499995 * unit) { //TODO: Use glmatrix.EPSILON
+            // singularity at the south pole
+            out[0] = -Math.PI / 2;
+            out[1] = 2 * Math.atan2(y, x);
+            out[2] = 0;
+        } else {
+            out[0] = Math.asin(2 * (x * z - w * y));
+            out[1] = Math.atan2(2 * (x * w + y * z), 1 - 2 * (z2 + w2));
+            out[2] = Math.atan2(2 * (x * y + z * w), 1 - 2 * (y2 + z2));
+        }
+        // TODO: Return them as degrees and not as radians
+
+        let toDegree = 180 / Math.PI;
+
+
+        out[0] *= toDegree
+        out[1] *= toDegree
+        out[2] *= toDegree
+        return out;
+    }
+
+    /**
+     * Creates a quaternion from the given euler angle x, y, z using the provided intrinsic order for the conversion.
+     *
+     * @param {quat} out the receiving quaternion
+     * @param {x} x Angle to rotate around X axis in degrees.
+     * @param {y} y Angle to rotate around Y axis in degrees.
+     * @param {z} z Angle to rotate around Z axis in degrees.
+     * @param {'zyx'|'xyz'|'yxz'|'yzx'|'zxy'|'zyx'} order Intrinsic order for conversion, default is zyx.
+     * @returns {quat} out
+     * @function
+     */
+    _fromEuler(out, x, y, z, order = 'xyz') {
+        let halfToRad = Math.PI / 360;
+        x *= halfToRad;
+        z *= halfToRad;
+        y *= halfToRad;
+
+        let sx = Math.sin(x);
+        let cx = Math.cos(x);
+        let sy = Math.sin(y);
+        let cy = Math.cos(y);
+        let sz = Math.sin(z);
+        let cz = Math.cos(z);
+
+        switch (order) {
+            case "xyz":
+                out[0] = sx * cy * cz + cx * sy * sz;
+                out[1] = cx * sy * cz - sx * cy * sz;
+                out[2] = cx * cy * sz + sx * sy * cz;
+                out[3] = cx * cy * cz - sx * sy * sz;
+                break;
+
+            case "xzy":
+                out[0] = sx * cy * cz - cx * sy * sz;
+                out[1] = cx * sy * cz - sx * cy * sz;
+                out[2] = cx * cy * sz + sx * sy * cz;
+                out[3] = cx * cy * cz + sx * sy * sz;
+                break;
+
+            case "yxz":
+                out[0] = sx * cy * cz + cx * sy * sz;
+                out[1] = cx * sy * cz - sx * cy * sz;
+                out[2] = cx * cy * sz - sx * sy * cz;
+                out[3] = cx * cy * cz + sx * sy * sz;
+                break;
+
+            case "yzx":
+                out[0] = sx * cy * cz + cx * sy * sz;
+                out[1] = cx * sy * cz + sx * cy * sz;
+                out[2] = cx * cy * sz - sx * sy * cz;
+                out[3] = cx * cy * cz - sx * sy * sz;
+                break;
+
+            case "zxy":
+                out[0] = sx * cy * cz - cx * sy * sz;
+                out[1] = cx * sy * cz + sx * cy * sz;
+                out[2] = cx * cy * sz + sx * sy * cz;
+                out[3] = cx * cy * cz - sx * sy * sz;
+                break;
+
+            case "zyx":
+                out[0] = sx * cy * cz - cx * sy * sz;
+                out[1] = cx * sy * cz + sx * cy * sz;
+                out[2] = cx * cy * sz - sx * sy * cz;
+                out[3] = cx * cy * cz + sx * sy * sz;
+                break;
+
+            default:
+                throw new Error('Unknown angle order ' + order);
+        }
+
+        return out;
     }
 }
 
